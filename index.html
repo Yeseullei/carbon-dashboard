@@ -295,11 +295,11 @@ const NDC_EMIT = ['NDC_전환','NDC_산업','NDC_건물','NDC_수송','NDC_농�
 const nd = (codes, y) => codes.some(c => (NDC[c] || {})[y] == null) ? null : sum(codes.map(c => NDC[c][y]));
 const PAIRS = {
   power: {name: '전환', ets: '발전', codes: ['NDC_전환'], ndcLabel: 'NDC 전환 목표', etsLabel: 'ETS 발전 배출허용총량',
-    sub: 'NDC 전환 부문 목표와 ETS 발전 부문 배출허용총량 (백만 톤). 3차 \'전환\'은 4차 \'발전\'에 대응시킨 근사',
-    note: 'ETS 발전은 전환 부문의 발전 사업장 중심이라 두 범위가 거의 같습니다.'},
+    sub: 'NDC 전환 부문 목표와 ETS 발전 부문 배출허용총량 (백만 톤). 3차 \'전환\'은 4차 \'발전\'에 대응시킨 근사. 두 값은 범위가 다릅니다',
+    note: 'ETS 발전은 할당대상업체만 포함하며 전환 부문 전체를 다루지 않습니다.'},
   other: {name: '산업·건물·수송·폐기물', ets: '발전외', codes: ['NDC_산업','NDC_건물','NDC_수송','NDC_폐기물'], ndcLabel: 'NDC 산업+건물+수송+폐기물 목표', etsLabel: 'ETS 발전외 배출허용총량',
     sub: 'NDC 산업·건물·수송·폐기물 목표 합계와 ETS 발전외 배출허용총량 (백만 톤)',
-    note: 'ETS 발전외에는 공공·기타도 포함되고, NDC 산업 등에는 ETS 할당대상이 아닌 소규모 배출이 들어 있어 두 범위가 정확히 같지는 않습니다.'},
+    note: 'ETS 발전외에는 공공·기타도 포함되고, NDC 산업 등에는 ETS 할당대상이 아닌 소규모 배출이 들어 있어 두 범위가 같지 않습니다.'},
   all: {name: '전체', ets: '전체', codes: NDC_EMIT, ndcLabel: 'NDC 배출부문 합계', etsLabel: 'ETS 배출허용총량',
     sub: 'NDC 배출 8개 부문 합계(흡수원·CCUS·국제감축 제외)와 ETS 배출허용총량 전체 (백만 톤)',
     note: 'NDC 합계에는 농축수산·탈루·수소 부문처럼 ETS가 다루지 않는 배출이 들어 있습니다.'}};
@@ -317,7 +317,7 @@ function ndcPair() {
   table('t-ndc2', ['', ...ys], [
     [P.ndcLabel.replace('NDC ', ''), ...ndcV.map(f1)], ['ETS ' + P.ets + ' 총량', ...etsV.map((v, i) => f1(v) + (est[i] ? ' <b title="3차 기간 안분 추정치">*</b>' : ''))],
     ['ETS − NDC', ...diff.map(v => (v > 0 ? '+' : '') + f1(v))], ['ETS ÷ NDC', ...ratio.map(v => (v * 100).toFixed(1) + '%')]]);
-  $('#ndc2-note').innerHTML = `<b>*</b> 표시는 추정치입니다. 3차 계획기간(2021–2025)은 연도별 배출허용총량이 공표되지 않아, 기간 전체 총량을 연도별 사전할당량 비중으로 나눠 계산했습니다. 4차(2026–2030)는 할당계획 공표값이라 표시가 없습니다. ` + P.note + ` 비율이 100% 미만이면 ETS 총량이 NDC 목표보다 낮게 잡혔다는 뜻입니다.`;
+  $('#ndc2-note').innerHTML = `<b>*</b> 표시는 추정치입니다. 3차 계획기간(2021–2025)은 연도별 배출허용총량이 공표되지 않아, 기간 전체 총량을 연도별 사전할당량 비중으로 나눠 계산했습니다. 4차(2026–2030)는 할당계획 공표값이라 표시가 없습니다. ` + P.note + ` ETS ÷ NDC는 ETS 총량이 NDC 목표의 몇 %인지를 보여 줄 뿐, ETS가 더 엄격한지를 뜻하지 않습니다. 범위가 다르므로 비율의 수준보다 연도별 변화(감소 속도)를 보세요.`;
 }
 const ndcSel = seg('ndc2-sel', () => ndcPair());
 function ndcSectors() {
@@ -335,12 +335,13 @@ function ndcSectors() {
 V.ndc = function () {
   const dTot = P4.total / P3.total - 1, dPre = P4.pre / P3.pre - 1, dCap = P4.cap / P3.cap - 1;
   const r30 = D.ndcVsEts.find(r => r.y == 2030), rMin = D.ndcVsEts.reduce((a, b) => a.ratio < b.ratio ? a : b);
-  $('#ndc-lede').innerHTML = `4차 계획기간(2026–2030) 배출권 총수량은 3차보다 <b>${pct(dTot)}</b> 줄었고, 사전할당량은 <b>${pct(dPre)}</b> 줄었습니다. 발전 부문 배출허용총량은 NDC 전환 목표의 <b>${(rMin.ratio*100).toFixed(0)}–${(Math.max(...D.ndcVsEts.filter(r=>r.y>=2026).map(r=>r.ratio))*100).toFixed(0)}%</b> 수준으로, 국가 목표보다 낮게 설정됐습니다.`;
+  const dE = capOf('발전', 2030) / capOf('발전', 2026) - 1, dN = NDC.NDC_전환[2030] / NDC.NDC_전환[2026] - 1;
+  $('#ndc-lede').innerHTML = `4차 계획기간(2026–2030) 배출권 총수량은 3차 대비 <b>${pct(dTot)}</b>, 사전할당량은 <b>${pct(dPre)}</b> 변했습니다. 2026→2030년 감소 속도는 ETS 발전 배출허용총량이 <b>${pct(dE)}</b>, NDC 전환 목표가 <b>${pct(dN)}</b>로 비슷합니다. 다만 ETS는 할당대상업체만 포함하고 전환 부문 전체를 다루지 않으므로, 두 값의 수준을 비교해 어느 쪽이 더 엄격한지는 말할 수 없습니다.`;
   $('#ndc-tiles').innerHTML =
     tile('배출권 총수량 (5년 합)', `${f0(P4.total/1e6)}<small>백만 KAU</small>`, `3차 ${f0(P3.total/1e6)} → 4차 <b class="dn">${pct(dTot)}</b>`) +
     tile('사전할당량 (5년 합)', `${f0(P4.pre/1e6)}<small>백만 KAU</small>`, `3차 ${f0(P3.pre/1e6)} → 4차 <b class="dn">${pct(dPre)}</b>`) +
     tile('연도별 배출허용총량', `${f0(capOf('전체',2026))} → ${f0(capOf('전체',2030))}<small>백만</small>`, `2026 → 2030, 매년 ${f1(capOf('전체',2026)-capOf('전체',2027))}백만씩 감소`) +
-    tile('2030 발전 총량 ÷ NDC 전환 목표', `${(r30.ratio*100).toFixed(1)}<small>%</small>`, `ETS ${f1(r30.ets)} / NDC ${f1(r30.ndc)}백만 톤`);
+    tile('2026→2030 감소율', `${pct(dE)}<small>ETS 발전</small>`, `NDC 전환 목표 ${pct(dN)} · 2030 ETS ${f1(r30.ets)} / NDC ${f1(r30.ndc)}백만 톤`);
 
   const years = []; for (let y = 2018; y <= 2030; y++) years.push(y);
   const mode = ndcMode();
