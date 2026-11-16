@@ -55,6 +55,7 @@ section.view{display:flex;flex-direction:column;gap:16px}
 .panel .sub{font-size:12.5px;color:var(--ink2);margin:0}
 .phead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:8px}
 .chart{width:100%;height:340px}
+.chart.grow{flex:1;height:auto;min-height:340px}
 .chart.tall{height:460px} .chart.short{height:260px}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;flex:none}
 .seg button{font:inherit;font-size:12.5px;padding:4px 10px;background:var(--surface);color:var(--ink2);border:0;border-left:1px solid var(--line);cursor:pointer}
@@ -88,6 +89,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .sugg li span{color:var(--ink3);font-size:12px}
 .cohead{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline}
 .cohead h2{font-size:20px;margin:0}
+.compact th,.compact td{padding:5px 6px;font-size:12px}
 .method h3{font-size:14px;margin:10px 0 0}
 .method p,.method li{max-width:78ch;margin:0;color:var(--ink2)}
 .method ul,.method ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
@@ -113,10 +115,10 @@ footer{color:var(--ink3);font-size:12px;padding-block:0 32px}
   <div class="grid2">
     <div class="panel"><div class="phead"><div><h2>국가 NDC 경로와 ETS 배출허용총량</h2><p class="sub">NDC 순배출 목표(2023.3 수정안)와 ETS 연도별 배출허용총량</p></div>
       <div class="seg" id="ndc-mode"><button data-v="abs" aria-pressed="true">백만 톤</button><button data-v="idx" aria-pressed="false">지수 (2025=100)</button></div></div>
-      <div class="chart" id="c-ndc1"></div><p class="note">3차(2021–2025) 연도별 총량은 공표값이 없어 사전할당 비중으로 안분한 추정치, 4차(2026–2030)는 공표값.</p></div>
-    <div class="panel" style="grid-column:1/-1"><div class="phead"><div><h2>부문별 NDC 목표와 ETS 배출허용총량</h2><p class="sub" id="ndc2-sub"></p></div>
-      <div class="seg" id="ndc2-sel"><button data-v="power" aria-pressed="true">전환 ↔ 발전</button><button data-v="other" aria-pressed="false">산업·건물·수송·폐기물 ↔ 발전외</button><button data-v="all" aria-pressed="false">전체</button></div></div>
-      <div class="chart short" id="c-ndc2"></div><div class="tblwrap" style="max-height:none"><table id="t-ndc2"></table></div>
+      <div class="chart grow" id="c-ndc1"></div><p class="note">3차(2021–2025) 연도별 총량은 공표값이 없어 사전할당 비중으로 안분한 추정치, 4차(2026–2030)는 공표값.</p></div>
+    <div class="panel"><div class="phead"><div><h2>부문별 NDC 목표와 ETS 배출허용총량</h2><p class="sub" id="ndc2-sub"></p></div>
+      <div class="seg" id="ndc2-sel"><button data-v="power" aria-pressed="true">전환↔발전</button><button data-v="other" aria-pressed="false" title="산업·건물·수송·폐기물 ↔ 발전외">산업 등↔발전외</button><button data-v="all" aria-pressed="false">전체</button></div></div>
+      <div class="chart short" id="c-ndc2"></div><div class="tblwrap" style="max-height:none"><table id="t-ndc2" class="compact"></table></div>
       <p class="note" id="ndc2-note"></p></div>
     <div class="panel" style="grid-column:1/-1"><h2>NDC 부문별 감축 경로 (2023.3 수정안)</h2><p class="sub">왼쪽: 2018년을 100으로 한 지수. 오른쪽: 부문별 목표와 ETS가 다루는 범위 (백만 톤CO₂eq)</p>
       <div class="grid2" style="align-items:start"><div class="chart" id="c-ndc5"></div><div class="tblwrap"><table id="t-ndc5"></table></div></div></div>
@@ -307,16 +309,17 @@ function ndcPair() {
   const P = PAIRS[ndcSel()], ys = [2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030];
   const ndcV = ys.map(y => nd(P.codes, y)), row = ys.map(y => D.capYear.find(r => r.sg === P.ets && r.y === y)), etsV = row.map(r => r.q / 1e6), est = row.map(r => r.basis !== '공표');
   const ratio = ys.map((_, i) => etsV[i] / ndcV[i]), diff = ys.map((_, i) => etsV[i] - ndcV[i]);
-  $('#ndc2-sub').textContent = P.sub;
+  $('#ndc2-sub').textContent = P.sub; $('#ndc2-note').dataset.pair = P.name;
   const firstEst = ys[est.indexOf(true)], lastEst = ys[est.lastIndexOf(true)];
   draw('c-ndc2', {
     xAxis: cat(ys), yAxis: val({scale: true}),
+    legend: {type: 'scroll'},
     tooltip: {formatter: ps => `<b>${ps[0].axisValue}</b><br>` + ps.map(p => `${p.marker}${p.seriesName} <b>${f1(p.value)}</b>`).join('<br>') + `<br>ETS ÷ NDC ${(ratio[ys.indexOf(+ps[0].axisValue)]*100).toFixed(1)}%` + (est[ys.indexOf(+ps[0].axisValue)] ? '<br>※ ETS는 안분 추정치' : '')},
     series: [ln(P.ndcLabel, ndcV, S(1)), ln(P.etsLabel, etsV, S(3), {lineStyle: {width: 3, color: S(3)},
       markArea: {silent: true, itemStyle: {color: css('--ghost'), opacity: .3}, label: {color: css('--ink2'), fontSize: 11, position: 'insideTop'}, data: [[{name: '3차 안분 추정', xAxis: String(firstEst)}, {xAxis: String(lastEst)}]]}})]});
   table('t-ndc2', ['', ...ys], [
-    [P.ndcLabel.replace('NDC ', ''), ...ndcV.map(f1)], ['ETS ' + P.ets + ' 총량', ...etsV.map((v, i) => f1(v) + (est[i] ? ' <b title="3차 기간 안분 추정치">*</b>' : ''))],
-    ['ETS − NDC', ...diff.map(v => (v > 0 ? '+' : '') + f1(v))], ['ETS ÷ NDC', ...ratio.map(v => (v * 100).toFixed(1) + '%')]]);
+    ['NDC 목표', ...ndcV.map(f1)], ['ETS 총량', ...etsV.map((v, i) => f1(v) + (est[i] ? ' <b title="3차 기간 안분 추정치">*</b>' : ''))],
+    ['차이', ...diff.map(v => (v > 0 ? '+' : '') + f1(v))], ['ETS÷NDC', ...ratio.map(v => (v * 100).toFixed(0) + '%')]]);
   $('#ndc2-note').innerHTML = `<b>*</b> 표시는 추정치입니다. 3차 계획기간(2021–2025)은 연도별 배출허용총량이 공표되지 않아, 기간 전체 총량을 연도별 사전할당량 비중으로 나눠 계산했습니다. 4차(2026–2030)는 할당계획 공표값이라 표시가 없습니다. ` + P.note + ` ETS ÷ NDC는 ETS 총량이 NDC 목표의 몇 %인지를 보여 줄 뿐, ETS가 더 엄격한지를 뜻하지 않습니다. 범위가 다르므로 비율의 수준보다 연도별 변화(감소 속도)를 보세요.`;
 }
 const ndcSel = seg('ndc2-sel', () => ndcPair());
