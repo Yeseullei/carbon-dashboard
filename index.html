@@ -153,8 +153,10 @@ footer{color:var(--ink3);font-size:12px;padding-block:0 32px}
   </div>
   <div class="tiles" id="pw-tiles"></div>
   <div class="panel"><h2>에너지원별 발전량</h2><p class="sub" id="pw-sub1"></p><div class="chart" id="c-pw1"></div></div>
-  <div class="grid2">
-    <div class="panel"><h2>석탄 발전량: 연도별 월 추이</h2><p class="sub">같은 달끼리 비교 (GWh)</p><div class="chart" id="c-pw3"></div></div>
+  <div style="display:contents">
+    <div class="panel"><div class="phead"><div><h2>연도별 월 추이와 연말까지 예측</h2><p class="sub">같은 달끼리 비교 (GWh). 점선은 예측</p></div>
+      <select id="pw-src" aria-label="에너지원"></select></div><div class="chart" id="c-pw3"></div>
+      <div class="tblwrap"><table id="t-pwf"></table></div><p class="note" id="pw-fnote"></p></div>
     <div class="panel"><div class="phead"><div><h2>발전사별 연료 구성</h2><p class="sub">전력통계월보 회사별 발전량</p></div>
       <select id="pw-co" aria-label="발전사"></select></div><div class="chart" id="c-pw2"></div></div>
   </div>
@@ -402,6 +404,19 @@ V.balance = function () {
 /* ── 4. 전력 ─────────────────────────────────────────── */
 const SRC = ['원자력', '석탄', '가스', '신재생', '유류', '양수', '기타'];
 const FUELS = ['원자력', '석탄', '복합(LNG)', '대체에너지', '기타', '수력'], FUELC = [1, 2, 3, 4, 7, 6];
+const pick2 = (o, len) => [...Array(len)].map((_, k) => sum(SRC.map(s => o[s][k])));
+function pwFc(a, cut, h) { const g = sum(a.slice(cut - 2, cut + 1)) / sum(a.slice(cut - 14, cut - 11)); return {g, f: [...Array(h)].map((_, i) => a[cut - 11 + i] * g)}; }
+function pwForecast() {   // 최근월 다음 달부터 12월까지
+  const M = D.power.srcM, n = M.t.length, y = M.t[n - 1].slice(0, 4), m = +M.t[n - 1].slice(5), h = 12 - m, f = {}, g = {};
+  SRC.forEach(s => { const r = pwFc(M.s[s], n - 1, h); f[s] = r.f; g[s] = r.g; });
+  return {y, m, h, f, g, t: [...Array(h)].map((_, i) => `${y}-${String(m + 1 + i).padStart(2, '0')}`)};
+}
+function pwBacktest() {   // 과거 연도의 같은 시점에서 같은 방법으로 예측했을 때의 합계 오차
+  const M = D.power.srcM, n = M.t.length, y = +M.t[n - 1].slice(0, 4), mm = M.t[n - 1].slice(5), h = 12 - +mm, years = [], err = {};
+  for (let Y = y - 1; ; Y--) { const cut = M.t.indexOf(`${Y}-${mm}`); if (cut < 14) break; years.unshift(Y);
+    ['석탄', '가스', '원자력', '신재생'].forEach(s => { const a = M.s[s], act = sum(a.slice(cut + 1, cut + 1 + h)); (err[s] = err[s] || []).push(Math.abs(sum(pwFc(a, cut, h).f) / act - 1)); }); }
+  return {years, txt: Object.entries(err).map(([s, e]) => `${s} ${(sum(e) / e.length * 100).toFixed(0)}%`).join(', ')};
+}
 V.power = function () {
   const g = pwGrain(), mode = pwMode(), P = D.power, src = g === 'M' ? P.srcM : P.srcY;
   const T = src.t, tot = T.map((_, i) => sum(SRC.map(s => src.s[s][i])));
@@ -413,16 +428,33 @@ V.power = function () {
     tile('석탄 발전량', `${f0(M.s['석탄'][n-1])}<small>GWh</small>`, `전년 동월 대비 ${pct(M.s['석탄'][n-1] / M.s['석탄'][n-13] - 1)} · 비중 ${(share('석탄', n-1)*100).toFixed(1)}%`) +
     tile('가스 발전량', `${f0(M.s['가스'][n-1])}<small>GWh</small>`, `전년 동월 대비 ${pct(M.s['가스'][n-1] / M.s['가스'][n-13] - 1)} · 비중 ${(share('가스', n-1)*100).toFixed(1)}%`) +
     tile('무탄소 비중 (원자력+신재생)', `${((share('원자력', n-1) + share('신재생', n-1))*100).toFixed(1)}<small>%</small>`, `전년 동월 ${((share('원자력', n-13) + share('신재생', n-13))*100).toFixed(1)}%`);
-  $('#pw-sub1').textContent = g === 'M' ? `${T[0]} ~ ${last(T)}, 월별` : `${T[0]} ~ ${last(T)}, 연간`;
-  draw('c-pw1', {tooltip: {axisPointer: {type: 'shadow'}}, xAxis: cat(T), yAxis: val(mode === 'pct' ? {max: 100} : {}),
-    series: SRC.map((s, i) => stackBar(s, conv(src.s[s]), S(i + 1), 'a', {barMaxWidth: 60}))});
+  const F = pwForecast(), nT = T.length;
+  const ext = {}; SRC.forEach(s => ext[s] = src.s[s].concat(!F.h ? [] : g === 'M' ? F.f[s] : [sum(M.s[s].filter((_, k) => M.t[k].startsWith(F.y))) + sum(F.f[s])]));
+  const T2 = T.concat(!F.h ? [] : g === 'M' ? F.t : [F.y + ' 전망']), tot2 = T2.map((_, i) => sum(SRC.map(s => ext[s][i])));
+  $('#pw-sub1').textContent = `${T[0]} ~ ${last(T)}, ${g === 'M' ? '월별' : '연간'}` + (F.h ? `. 옅은 막대는 예측(${g === 'M' ? `${F.t[0]} ~ ${last(F.t)}` : `${F.y}년 = 1–${F.m}월 실적 + ${F.m + 1}–12월 예측`})` : '');
+  draw('c-pw1', {tooltip: {axisPointer: {type: 'shadow'}}, xAxis: cat(T2), yAxis: val(mode === 'pct' ? {max: 100} : {}),
+    series: SRC.map((s, i) => stackBar(s, ext[s].map((v, k) => { const x = mode === 'pct' ? +(v / tot2[k] * 100).toFixed(1) : Math.round(v); return k < nT ? x : {value: x, itemStyle: {opacity: .4}}; }), S(i + 1), 'a', {barMaxWidth: 60}))});
 
-  const coal = M.s['석탄'], yrs = [...new Set(M.t.map(t => t.slice(0, 4)))];
-  const ramp = [css('--ghost'), S(4), S(3), S(1)];
-  draw('c-pw3', {xAxis: cat([...Array(12)].map((_, i) => (i + 1) + '월')), yAxis: val({scale: true}),
-    series: yrs.map((y, k) => { const lastY = k === yrs.length - 1;
-      return ln(y + '년', [...Array(12)].map((_, m) => { const ix = M.t.indexOf(`${y}-${String(m + 1).padStart(2, '0')}`); return ix < 0 ? null : Math.round(coal[ix]); }),
-        ramp[k + ramp.length - yrs.length] || css('--ghost'), {lineStyle: {width: lastY ? 3 : 2, color: ramp[k + ramp.length - yrs.length]}, symbolSize: lastY ? 7 : 5}); })});
+  const ss = $('#pw-src');
+  if (!ss.options.length) { ss.innerHTML = ['전체', ...SRC].map(x => `<option${x === '석탄' ? ' selected' : ''}>${x}</option>`).join(''); ss.onchange = () => V.power(); }
+  const pick = (o, len) => ss.value === '전체' ? [...Array(len)].map((_, k) => sum(SRC.map(s => o[s][k]))) : o[ss.value];
+  const arr = pick(M.s, n), farr = F.h ? pick(F.f, F.h) : [], yrs = [...new Set(M.t.map(t => t.slice(0, 4)))];
+  const ramp = [css('--ghost'), S(4), S(3), S(1)], colOf = k => ramp[k + ramp.length - yrs.length] || css('--ghost');
+  const lines = yrs.map((y, k) => { const lastY = k === yrs.length - 1;
+    return ln(y + '년', [...Array(12)].map((_, m) => { const ix = M.t.indexOf(`${y}-${String(m + 1).padStart(2, '0')}`); return ix < 0 ? null : Math.round(arr[ix]); }),
+      colOf(k), {lineStyle: {width: lastY ? 3 : 2, color: colOf(k)}, symbolSize: lastY ? 7 : 5}); });
+  if (F.h) lines.push(ln(F.y + '년 예측', [...Array(12)].map((_, m) => m + 1 === F.m ? Math.round(arr[n - 1]) : m + 1 > F.m ? Math.round(farr[m - F.m]) : null),
+    colOf(yrs.length - 1), {lineStyle: {width: 2.5, type: 'dashed', color: colOf(yrs.length - 1)}, symbol: 'emptyCircle', symbolSize: 7}));
+  draw('c-pw3', {xAxis: cat([...Array(12)].map((_, i) => (i + 1) + '월')), yAxis: val({scale: true}), series: lines});
+  if (F.h) {
+    const py = String(+F.y - 1), yOf = (a, y) => sum(a.filter((_, k) => M.t[k].startsWith(y)));
+    const row = (name, a, f, cls) => { const prev = yOf(a, py), ytd = yOf(a, F.y), fs = sum(f);
+      return `<tr${cls ? ' class="sum"' : ''}><td>${name}</td><td>${f0(prev)}</td><td>${f0(ytd)}</td><td>${f0(fs)}</td><td>${f0(ytd + fs)}</td><td>${pct((ytd + fs) / prev - 1)}</td><td>${(F.g[name] ? pct(F.g[name] - 1) : '')}</td></tr>`; };
+    table('t-pwf', ['에너지원', `${py} 실적`, `${F.y} 1–${F.m}월 실적`, `${F.m + 1}–12월 예측`, `${F.y} 연간 전망`, '전년 대비', '적용 증감률'],
+      SRC.map(s => row(s, M.s[s], F.f[s])).concat([row('합계', pick2(M.s, n), pick2(F.f, F.h), 1)]));
+    const bt = pwBacktest();
+    $('#pw-fnote').textContent = `예측 방법: 전년 같은 달 발전량 × 최근 3개월의 전년 동기 대비 증감률(계절성은 전년 값으로, 추세는 최근 3개월로 반영). 에너지원별로 따로 계산하고 합계는 그 합입니다. 같은 방법으로 ${bt.years.join('·')}년 ${F.m + 1}–12월을 맞춰 본 합계 오차는 ${bt.txt}. 원전 정비 일정, 기온, 연료가격은 반영하지 않습니다.`;
+  }
 
   const G = g === 'M' ? P.gencoM : P.gencoY, sel = $('#pw-co');
   if (!sel.options.length) sel.innerHTML = Object.keys(G.s).map(c => `<option>${c}</option>`).join('');
