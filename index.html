@@ -9,21 +9,21 @@
   /* 팔레트: #06300D 짙은 녹색(글자, 머리띠), #5A7846 올리브(강조), #E5BC12 금색(머리띠 포인트), #6AD6E5 하늘색(머리띠 보조), #5E3408 갈색(제목).
      차트 8색은 위 색 계열에서 명도와 채도를 조정해 색맹 시뮬레이션과 명도 대역 검증을 통과시킨 값 */
   --bg:#f1f4ec; --surface:#ffffff; --surface2:#e7ede0; --line:#d1dac5;
-  --ink:#06300d; --ink2:#42533d; --ink3:#73806b; --accent:#5a7846; --accent-ink:#ffffff; --head:#5e3408;
+  --ink:#06300d; --ink2:#42533d; --ink3:#73806b; --accent:#6ad6e5; --accent-ink:#06300d; --focus:#1f8fa3; --head:#5e3408;
   --hdr:#06300d; --hdr-ink:#ffffff; --hdr-dim:#b7cbb0; --gold:#e5bc12; --cyan:#6ad6e5;
-  --s1:#4d7b3a; --s2:#cfb13c; --s3:#26bed6; --s4:#b64e3e; --s5:#3068be; --s6:#b46824; --s7:#823283; --s8:#cc7083;
+  --s1:#43c7da; --s2:#4c763a; --s3:#c9b04a; --s4:#b34d3e; --s5:#2777cb; --s6:#bd7115; --s7:#842e7a; --s8:#d07a88;
   --good:#0ca30c; --warn:#fab219; --crit:#d03b3b; --ghost:#c3ccb9;
   --font:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   --bg:#0b130d; --surface:#141f17; --surface2:#1c2a20; --line:#2a3b2e;
-  --ink:#e8efe2; --ink2:#b2bfa9; --ink3:#7f8c77; --accent:#9bbb7b; --accent-ink:#0b130d; --head:#e3c49b;
-  --s1:#547530; --s2:#a99333; --s3:#0497a7; --s4:#bf6459; --s5:#5788d3; --s6:#c0792f; --s7:#904599; --s8:#c66c84;
+  --ink:#e8efe2; --ink2:#b2bfa9; --ink3:#7f8c77; --accent:#6ad6e5; --accent-ink:#06300d; --focus:#6ad6e5; --head:#e3c49b;
+  --s1:#22a0ab; --s2:#4a773c; --s3:#b49015; --s4:#a74743; --s5:#367cc7; --s6:#b77737; --s7:#944f86; --s8:#d96c82;
   --ghost:#3a4a3d; color-scheme:dark } }
 :root[data-theme="dark"]{
   --bg:#0b130d; --surface:#141f17; --surface2:#1c2a20; --line:#2a3b2e;
-  --ink:#e8efe2; --ink2:#b2bfa9; --ink3:#7f8c77; --accent:#9bbb7b; --accent-ink:#0b130d; --head:#e3c49b;
-  --s1:#547530; --s2:#a99333; --s3:#0497a7; --s4:#bf6459; --s5:#5788d3; --s6:#c0792f; --s7:#904599; --s8:#c66c84;
+  --ink:#e8efe2; --ink2:#b2bfa9; --ink3:#7f8c77; --accent:#6ad6e5; --accent-ink:#06300d; --focus:#6ad6e5; --head:#e3c49b;
+  --s1:#22a0ab; --s2:#4a773c; --s3:#b49015; --s4:#a74743; --s5:#367cc7; --s6:#b77737; --s7:#944f86; --s8:#d96c82;
   --ghost:#3a4a3d; color-scheme:dark }
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
@@ -38,9 +38,9 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background
 nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
 nav.tabs a{flex:none;padding:8px 12px;color:var(--hdr-dim);text-decoration:none;font-weight:500;border-bottom:2px solid transparent;white-space:nowrap}
 nav.tabs a:hover{color:#fff}
-header.top a:focus-visible{outline-color:var(--gold)}
-nav.tabs a[aria-current="page"]{color:#fff;border-color:var(--gold);font-weight:600}
-a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header.top a:focus-visible{outline-color:var(--cyan)}
+nav.tabs a[aria-current="page"]{color:#fff;border-color:var(--cyan);font-weight:600}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 main{padding-block:20px 48px;display:flex;flex-direction:column;gap:16px}
 section.view{display:flex;flex-direction:column;gap:16px}
 .lede{margin:0;color:var(--ink2);max-width:72ch}
@@ -176,7 +176,7 @@ footer{color:var(--ink3);font-size:12px;padding-block:0 32px}
 </section>
 
 <section class="view" id="v-power" hidden>
-  <div class="seg" id="pw-view" style="align-self:flex-start"><button data-v="a" aria-pressed="true">발전량 현황</button><button data-v="b" aria-pressed="false">발전5사 배출 전망</button><button data-v="c" aria-pressed="false">원자력·신재생</button></div>
+  <div class="seg" id="pw-view" style="align-self:flex-start"><button data-v="a" aria-pressed="true">발전량 현황</button><button data-v="b" aria-pressed="false">발전5사 배출 전망</button></div>
   <div id="pw-a" style="display:contents">
   <div class="ctl">
     <div class="seg" id="pw-grain"><button data-v="M" aria-pressed="true">월별</button><button data-v="Y">연간</button></div>
@@ -212,8 +212,16 @@ footer{color:var(--ink3);font-size:12px;padding-block:0 32px}
     <div class="grid2">
       <div class="panel"><h2 id="p5c-h">월별 석탄 발전량: 연도별 비교</h2><p class="sub">GWh. 같은 달끼리 겹쳐 본 값, 점선은 예측</p><div class="chart" id="c-p5c"></div></div>
       <div class="panel"><h2 id="p5l-h">월별 LNG 발전량: 연도별 비교</h2><p class="sub">GWh. 같은 달끼리 겹쳐 본 값, 점선은 예측</p><div class="chart" id="c-p5l"></div></div>
+      <div class="panel"><h2>전국 월별 원자력 발전량: 연도별 비교</h2><p class="sub">GWh. 전국 합계(발전사 구분 없음), 점선은 예측</p><div class="chart" id="c-p5n"></div></div>
+      <div class="panel"><h2>전국 월별 신재생 발전량: 연도별 비교</h2><p class="sub">GWh. 전국 합계(수력 포함), 점선은 예측</p><div class="chart" id="c-p5r"></div></div>
     </div>
     <div class="panel method" id="p5-model"></div>
+    <h3 class="sechead">원자력·신재생 (전국)</h3>
+    <div class="panel"><h2>원전 이용률 (단지별, 월)</h2><p class="sub" id="nr-sub4"></p><div class="chart" id="c-nr4" style="height:300px"></div>
+      <div class="tblwrap" style="max-height:none"><table id="t-nr4" class="compact"></table></div><p class="note" id="nr-n4"></p></div>
+    <div class="panel"><h2>신재생 구성 (유형별)</h2><p class="sub">월별 발전량, GWh. 월보 7-2 발전소별 값을 유형으로 묶음</p><div class="chart" id="c-nr5"></div>
+      <div class="tblwrap" style="max-height:none"><table id="t-nr5" class="compact"></table></div><p class="note" id="nr-n5"></p></div>
+    <h3 class="sechead">발전소별</h3>
     <div class="panel"><div class="phead"><div><h2 id="p5p-h"></h2><p class="sub" id="p5p-sub"></p></div>
       <div class="seg" id="p5p-f"><button data-v="cl" aria-pressed="true">석탄·LNG</button><button data-v="all" aria-pressed="false">전체</button></div></div>
       <div class="tblwrap"><table id="t-p5p"></table></div><p class="note" id="p5p-note"></p></div>
@@ -225,21 +233,6 @@ footer{color:var(--ink3);font-size:12px;padding-block:0 32px}
       <div class="panel"><h2>같은 방법으로 과거 연도를 맞춰 본 결과</h2><p class="sub">당해 연도 최근 데이터월까지만 알았다고 가정하고 연간 배출량을 예측 (만톤)</p><div class="tblwrap" style="max-height:none"><table id="t-p5b" class="compact"></table></div></div>
     </div>
     <div class="panel method" id="p5-method"></div>
-  </div>
-  <div id="pw-c" style="display:none;flex-direction:column;gap:16px">
-    <p class="lede" id="nr-lede"></p>
-    <div class="tiles" id="nr-tiles"></div>
-    <div class="panel"><h2>발전원별 발전량 증감 (전년 동월 대비)</h2><p class="sub">GWh. 0 위는 전년보다 늘어난 발전원, 아래는 줄어든 발전원. 검은 선은 전체 합</p><div class="chart" id="c-nr1"></div>
-      <div class="tblwrap" style="max-height:none"><table id="t-nr1"></table></div><p class="note" id="nr-n1"></p></div>
-    <div class="grid2">
-      <div class="panel"><h2>원자력 월별 발전량: 연도별 비교</h2><p class="sub">GWh. 같은 달끼리 겹쳐 본 값, 점선은 예측</p><div class="chart" id="c-nr2"></div></div>
-      <div class="panel"><h2>신재생 월별 발전량: 연도별 비교</h2><p class="sub">GWh. 같은 달끼리 겹쳐 본 값(수력 포함), 점선은 예측</p><div class="chart" id="c-nr3"></div></div>
-    </div>
-    <div class="panel"><h2>원전 이용률 (단지별, 월)</h2><p class="sub" id="nr-sub4"></p><div class="chart" id="c-nr4" style="height:300px"></div>
-      <div class="tblwrap" style="max-height:none"><table id="t-nr4" class="compact"></table></div><p class="note" id="nr-n4"></p></div>
-    <div class="panel"><h2>신재생 구성 (유형별)</h2><p class="sub">월별 발전량, GWh. 월보 7-2 발전소별 값을 유형으로 묶음</p><div class="chart" id="c-nr5"></div>
-      <div class="tblwrap" style="max-height:none"><table id="t-nr5" class="compact"></table></div><p class="note" id="nr-n5"></p></div>
-    <div class="panel method" id="nr-method"></div>
   </div>
 </section>
 
@@ -641,7 +634,7 @@ V.power = function () {
   if (!ss.options.length) { ss.innerHTML = ['전체', ...SRC].map(x => `<option${x === '석탄' ? ' selected' : ''}>${x}</option>`).join(''); ss.onchange = () => V.power(); }
   const pick = (o, len) => ss.value === '전체' ? [...Array(len)].map((_, k) => sum(SRC.map(s => o[s][k]))) : o[ss.value];
   const arr = pick(M.s, n), farr = F.h ? pick(F.f, F.h) : [], yrs = [...new Set(M.t.map(t => t.slice(0, 4)))];
-  const ramp = [css('--ghost'), S(4), S(3), S(1)], colOf = k => ramp[k + ramp.length - yrs.length] || css('--ghost');
+  const ramp = [css('--ghost'), S(2), S(3), S(1)], colOf = k => ramp[k + ramp.length - yrs.length] || css('--ghost');
   const lines = yrs.map((y, k) => { const lastY = k === yrs.length - 1;
     return ln(y + '년', [...Array(12)].map((_, m) => { const ix = M.t.indexOf(`${y}-${String(m + 1).padStart(2, '0')}`); return ix < 0 ? null : Math.round(arr[ix]); }),
       colOf(k), {lineStyle: {width: lastY ? 3 : 2, color: colOf(k)}, symbolSize: lastY ? 7 : 5}); });
@@ -1000,25 +993,28 @@ V.power5 = function () {
         label: {show: true, position: 'bottom', color: css('--ink'), fontSize: 11, formatter: q => f0(q.value)}})]});
   // 월별 연도별 비교 (석탄, LNG) + 누계 표
   const serie = k => T5.map((_, i) => sum(names.map(nm => G5D.m[nm][k][i]))), yrsM = [...new Set(T5.map(t => +t.slice(0, 4)))];
-  const colY = i => [css('--ghost'), S(4), S(3), S(1)][i + 4 - yrsM.length] || css('--ghost');
+  const colY = i => [css('--ghost'), S(2), S(3), S(1)][i + 4 - yrsM.length] || css('--ghost');
   const atM = (a, y, m) => { const i = T5.indexOf(`${y}-${String(m).padStart(2, '0')}`); return i < 0 ? null : Math.round(a[i]); };
-  const yoy = (id, k, f) => { const a = serie(k), fc = cur[f].map(Math.round);
+  const yoy = (id, a, fc0) => { const fc = fc0.map(Math.round);
     const lines = yrsM.map((y, i) => ln(y + '년', [...Array(12)].map((_, m) => atM(a, y, m + 1)), colY(i), {symbolSize: y === YR ? 7 : 5, lineStyle: {width: y === YR ? 3 : 2, color: colY(i)}}));
     if (fc.length) lines.push(ln(YR + '년 예측', [...Array(12)].map((_, m) => m + 1 === MM ? atM(a, YR, MM) : m + 1 > MM ? fc[m - MM] : null), colY(yrsM.length - 1), {lineStyle: {width: 2.5, type: 'dashed', color: colY(yrsM.length - 1)}, symbol: 'emptyCircle', symbolSize: 7}));
     draw(id, {xAxis: cat([...Array(12)].map((_, m) => (m + 1) + '월')), yAxis: val({scale: true}), series: lines}); };
   const who = cur.nm === '합계' ? '발전5사 합계' : cur.nm;
   $('#p5c-h').textContent = `${who} 월별 석탄 발전량: 연도별 비교`; $('#p5l-h').textContent = `${who} 월별 LNG 발전량: 연도별 비교`; $('#p5y-h').textContent = `${who} 누계 발전량: 올해 더 도는가`;
-  yoy('c-p5c', 'coal', 'cf'); yoy('c-p5l', 'lng', 'lf');
+  const SM = D.power.srcM, nat = k => T5.map(p => { const i = SM.t.indexOf(p); return i < 0 ? 0 : SM.s[k][i]; });
+  const natN = nat('원자력'), natR = nat('신재생'), nfN = H5 ? fcm(natN, n5 - 1, H5) : [], nfR = H5 ? fcm(natR, n5 - 1, H5) : [];
+  yoy('c-p5c', serie('coal'), cur.cf); yoy('c-p5l', serie('lng'), cur.lf); yoy('c-p5n', natN, nfN); yoy('c-p5r', natR, nfR);
   const ytd = (a, y) => sum(a.filter((_, i) => T5[i].startsWith(String(y)) && +T5[i].slice(5) <= MM)), full = (a, y) => sum(a.filter((_, i) => T5[i].startsWith(String(y))));
   const ca = serie('coal'), la = serie('lng'), ta = ca.map((v, i) => v + la[i]);
   const yrow = (nm, a, fcSum) => { const cy = ytd(a, YR), py = ytd(a, YR - 1), m3 = sum(a.slice(-3)) / sum(a.slice(-15, -12)) - 1, fy = full(a, YR) + fcSum, pf = full(a, YR - 1);
-    return `<tr${nm === '합계' ? ' class="sum"' : ''}><td>${nm}</td>${yrsM.map(y => `<td>${f0(ytd(a, y))}</td>`).join('')}<td class="${cy >= py ? 'up' : 'dn'}">${pct(cy / py - 1)}</td><td>${pct(m3)}</td><td>${f0(fy)}</td><td>${pct(fy / pf - 1)}</td></tr>`; };
+    return `<tr${nm.startsWith('합계') ? ' class="sum"' : ''}><td>${nm}</td>${yrsM.map(y => `<td>${f0(ytd(a, y))}</td>`).join('')}<td class="${cy >= py ? 'up' : 'dn'}">${pct(cy / py - 1)}</td><td>${pct(m3)}</td><td>${f0(fy)}</td><td>${pct(fy / pf - 1)}</td></tr>`; };
   const cfS = sum(cur.cf), lfS = sum(cur.lf);
-  table('t-p5y', ['', ...yrsM.map(y => `${y} 1–${MM}월`), `${YR} 전년 대비`, '최근 3개월 전년 대비', `${YR} 연간 (예측 포함)`, '전년 연간 대비'], [yrow('석탄', ca, cfS), yrow('LNG', la, lfS), yrow('합계', ta, cfS + lfS)]);
+  table('t-p5y', ['', ...yrsM.map(y => `${y} 1–${MM}월`), `${YR} 전년 대비`, '최근 3개월 전년 대비', `${YR} 연간 (예측 포함)`, '전년 연간 대비'], [yrow('석탄', ca, cfS), yrow('LNG', la, lfS), yrow('합계 (석탄+LNG)', ta, cfS + lfS), yrow('원자력 (전국)', natN, sum(nfN)), yrow('신재생 (전국)', natR, sum(nfR))]);
   $('#p5y-sub').textContent = `${cur.nm === '합계' ? '발전5사' : cur.nm}, 1월부터 ${MM}월까지 같은 기간 누계 (GWh)`;
-  const dc = ytd(ca, YR) / ytd(ca, YR - 1) - 1, dl = ytd(la, YR) / ytd(la, YR - 1) - 1;
-  $('#p5y-note').innerHTML = `올해 1–${MM}월 <b>석탄 발전량은 전년 동기보다 ${pct(dc)}</b>, <b>LNG 발전량은 ${pct(dl)}</b>입니다. 전년 대비가 +이면 올해 더 많이 돈 것입니다. 최근 3개월 전년 대비는 예측에 쓰는 성장률 g(−1)와 같은 값입니다.`;
+  const dc = ytd(ca, YR) / ytd(ca, YR - 1) - 1, dl = ytd(la, YR) / ytd(la, YR - 1) - 1, dn_ = ytd(natN, YR) / ytd(natN, YR - 1) - 1, dr_ = ytd(natR, YR) / ytd(natR, YR - 1) - 1;
+  $('#p5y-note').innerHTML = `올해 1–${MM}월 <b>석탄 발전량은 전년 동기보다 ${pct(dc)}</b>, <b>LNG 발전량은 ${pct(dl)}</b>입니다. 전국 기준으로는 <b>원자력 ${pct(dn_)}</b>, <b>신재생 ${pct(dr_)}</b>입니다(원자력과 신재생은 발전사별 구분이 없어 전국 값). 전년 대비가 +이면 올해 더 많이 돈 것입니다. 최근 3개월 전년 대비는 예측에 쓰는 성장률 g(−1)와 같은 값입니다.`;
   $('#p5-model').innerHTML = MODEL_HTML(n5);
+  nrPanels();
 
   // 표: 선택한 회사의 발전소별 발전량과 추이
   const PL = D.power.plants, nP = PL.t.length, fuelOf = c_ => /유연탄|무연탄|^석탄$/.test(c_) ? 'coal' : /LNG|^가스$/.test(c_) ? 'lng' : '';
@@ -1079,7 +1075,7 @@ function plantDetail(x) {
   const box = $('#p5-pd'); box.hidden = !x; if (!x) return;
   const PL = D.power.plants, nP = PL.t.length, a = x.r.v.map(v => v || 0), lastP = PL.t[nP - 1], yP = +lastP.slice(0, 4), mP = +lastP.slice(5), hP = 12 - mP;
   const years = [...new Set(PL.t.map(t => +t.slice(0, 4)))], at = (y, m) => { const i = PL.t.indexOf(`${y}-${String(m).padStart(2, '0')}`); return i < 0 ? null : Math.round(a[i]); };
-  const fc = hP ? fcm(a, nP - 1, hP).map(Math.round) : [], col = i => [css('--ghost'), S(4), S(1)][i + 3 - years.length] || css('--ghost');
+  const fc = hP ? fcm(a, nP - 1, hP).map(Math.round) : [], col = i => [css('--ghost'), S(3), S(1)][i + 3 - years.length] || css('--ghost');
   $('#p5d-h').textContent = `${x.r.name} 월별 발전량: 연도별 비교`;
   $('#p5d-sub').textContent = `${x.r.co} · ${x.r.cat} · GWh. ${lastP}까지 실적, 이후 ${hP}개월은 예측`;
   const series = years.map((y, i) => ln(y + '년', [...Array(12)].map((_, m) => at(y, m + 1)), col(i), {symbolSize: y === yP ? 7 : 5, lineStyle: {width: y === yP ? 3 : 2, color: col(i)}}));
@@ -1093,46 +1089,10 @@ function plantDetail(x) {
 }
 $('#t-p5p').addEventListener('click', e => { const tr = e.target.closest('tr[data-pk]'); if (tr) { p5Plant = tr.dataset.pk; V.power5(); } });
 const p5pF = seg('p5p-f', () => V.power5());
-const pwView = seg('pw-view', v => { $('#pw-a').style.display = v === 'a' ? 'contents' : 'none'; $('#pw-b').style.display = v === 'b' ? 'flex' : 'none'; $('#pw-c').style.display = v === 'c' ? 'flex' : 'none'; pwDraw(); });
+const pwView = seg('pw-view', v => { $('#pw-a').style.display = v === 'a' ? 'contents' : 'none'; $('#pw-b').style.display = v === 'b' ? 'flex' : 'none'; pwDraw(); });
 
-/* ── 전력통계: 원자력·신재생 ──────────────────────────── */
-const NRC = ['원자력', '석탄', '가스', '신재생'];
-V.powerNR = function () {
-  const P = D.power, M = P.srcM, NR = D.nr, n = M.t.length, last_ = M.t[n - 1], mm = +last_.slice(5), yy = +last_.slice(0, 4), h = 12 - mm;
-  const yrsN = [...new Set(M.t.map(t => +t.slice(0, 4)))], ytd = (a, y) => sum(a.filter((_, i) => M.t[i].startsWith(String(y)) && +M.t[i].slice(5) <= mm));
-  const S_ = k => M.s[k], tot = M.t.map((_, i) => sum(Object.keys(M.s).map(k => M.s[k][i])));
-  const oth = M.t.map((_, i) => (M.s['유류'] || [])[i] + (M.s['양수'] || [])[i] + (M.s['기타'] || [])[i]);
-  const d = k => ytd(S_(k), yy) - ytd(S_(k), yy - 1), dp = k => ytd(S_(k), yy) / ytd(S_(k), yy - 1) - 1;
-  const cf = Object.fromEntries(['원자력', '신재생'].map(k => [k, h ? fcm(S_(k), n - 1, h).map(Math.round) : []]));
-  const zf = i => { const t = tot[i], z = (S_('원자력')[i] + S_('신재생')[i]) / t; return z; };
-  const zY = (y) => (ytd(S_('원자력'), y) + ytd(S_('신재생'), y)) / sum(Object.keys(M.s).map(k => ytd(S_(k), y)));
-
-  $('#nr-lede').innerHTML = `${yy}년 1–${mm}월 <b>원자력 발전량은 전년 동기보다 ${pct(dp('원자력'))}(${f0(d('원자력'))}GWh)</b>, <b>신재생은 ${pct(dp('신재생'))}(+${f0(d('신재생'))}GWh)</b>이고 석탄은 ${pct(dp('석탄'))}(+${f0(d('석탄'))}GWh), 가스는 ${pct(dp('가스'))}(${f0(d('가스'))}GWh)입니다. 발전량 합계는 전년과 거의 같아(${pct(ytd(tot, yy) / ytd(tot, yy - 1) - 1)}) 원자력이 줄고 석탄과 신재생이 늘어난 구성 변화입니다.`;
-  $('#nr-tiles').innerHTML =
-    tile(`원자력 ${yy} 1–${mm}월`, `${f0(ytd(S_('원자력'), yy))}<small>GWh</small>`, `전년 동기 ${f0(ytd(S_('원자력'), yy - 1))} · <b class="${d('원자력') < 0 ? 'dn' : 'up'}">${pct(dp('원자력'))}</b>`) +
-    tile(`신재생 ${yy} 1–${mm}월`, `${f0(ytd(S_('신재생'), yy))}<small>GWh</small>`, `전년 동기 ${f0(ytd(S_('신재생'), yy - 1))} · <b class="up">${pct(dp('신재생'))}</b>`) +
-    tile('무탄소 비중 (원자력 + 신재생)', `${(zY(yy) * 100).toFixed(1)}<small>%</small>`, `전년 동기 ${(zY(yy - 1) * 100).toFixed(1)}% · 최근월 ${(zf(n - 1) * 100).toFixed(1)}%`) +
-    tile('원전 이용률 (최근 12개월)', `${nucUtilTxt().cur}<small>%</small>`, `직전 12개월 ${nucUtilTxt().prev}%`);
-
-  // 증감 차트
-  const ys = M.t.map((t, i) => i >= 12 ? t : null).filter(Boolean), dd = k => M.t.map((_, i) => i >= 12 ? Math.round(S_(k)[i] - S_(k)[i - 12]) : null).filter(v => v != null);
-  const dOth = oth.map((v, i) => i >= 12 ? Math.round(v - oth[i - 12]) : null).filter(v => v != null), dTot = tot.map((v, i) => i >= 12 ? Math.round(v - tot[i - 12]) : null).filter(v => v != null);
-  const cols = {원자력: S(1), 석탄: S(2), 가스: S(3), 신재생: S(4)};
-  draw('c-nr1', {tooltip: {axisPointer: {type: 'shadow'}}, xAxis: cat(ys), yAxis: val({}),
-    series: [...NRC.map(k => stackBar(k, dd(k), cols[k], 'a', {barMaxWidth: 26})), stackBar('유류·양수·기타', dOth, css('--ghost'), 'a', {barMaxWidth: 26}), ln('전체 증감', dTot, css('--ink'), {symbolSize: 4, lineStyle: {width: 2, color: css('--ink')}})]});
-  const yl = yrsN.slice(1);
-  table('t-nr1', ['', ...yrsN.map(y => `${y} 1–${mm}월`), ...yl.map(y => `${y} 증감`), `${yy} 증감률`], [...NRC.map(k => [k, ...yrsN.map(y => f0(ytd(S_(k), y))), ...yl.map(y => { const v = ytd(S_(k), y) - ytd(S_(k), y - 1); return `<span class="${v < 0 ? 'dn' : 'up'}">${v > 0 ? '+' : ''}${f0(v)}</span>`; }), pct(dp(k))]),
-    ['유류·양수·기타', ...yrsN.map(y => f0(ytd(oth, y))), ...yl.map(y => { const v = ytd(oth, y) - ytd(oth, y - 1); return (v > 0 ? '+' : '') + f0(v); }), pct(ytd(oth, yy) / ytd(oth, yy - 1) - 1)],
-    `<tr class="sum"><td>합계</td>${yrsN.map(y => `<td>${f0(ytd(tot, y))}</td>`).join('')}${yl.map(y => { const v = ytd(tot, y) - ytd(tot, y - 1); return `<td>${v > 0 ? '+' : ''}${f0(v)}</td>`; }).join('')}<td>${pct(ytd(tot, yy) / ytd(tot, yy - 1) - 1)}</td></tr>`]);
-  $('#nr-n1').textContent = `전체 발전량 증감 가운데 원자력이 ${f0(d('원자력'))}GWh, 석탄이 +${f0(d('석탄'))}GWh입니다. 원전 발전량이 석탄 발전량과 반대 방향으로 움직이는지 함께 보세요. 석탄 발전량은 배출량과 직결됩니다.`;
-
-  // 원자력·신재생 월별 연도 비교
-  const yoyN = (id, k) => { const a = S_(k), fc = cf[k], colY = i => [css('--ghost'), S(4), S(3), S(1)][i + 4 - yrsN.length] || css('--ghost'), at = (y, m) => { const i = M.t.indexOf(`${y}-${String(m).padStart(2, '0')}`); return i < 0 ? null : Math.round(a[i]); };
-    const lines = yrsN.map((y, i) => ln(y + '년', [...Array(12)].map((_, m) => at(y, m + 1)), colY(i), {symbolSize: y === yy ? 7 : 5, lineStyle: {width: y === yy ? 3 : 2, color: colY(i)}}));
-    if (fc.length) lines.push(ln(yy + '년 예측', [...Array(12)].map((_, m) => m + 1 === mm ? at(yy, mm) : m + 1 > mm ? fc[m - mm] : null), colY(yrsN.length - 1), {lineStyle: {width: 2.5, type: 'dashed', color: colY(yrsN.length - 1)}, symbol: 'emptyCircle', symbolSize: 7}));
-    draw(id, {xAxis: cat([...Array(12)].map((_, m) => (m + 1) + '월')), yAxis: val({scale: true}), series: lines}); };
-  yoyN('c-nr2', '원자력'); yoyN('c-nr3', '신재생');
-
+function nrPanels() {
+  const M = D.power.srcM, NR = D.nr, n = M.t.length, last_ = M.t[n - 1], mm = +last_.slice(5), yy = +last_.slice(0, 4), S_ = k => M.s[k];
   // 원전 이용률
   const sites = ['한빛', '한울', '고리', '월성', '신고리·새울', '신월성', '신한울'], T = NR.t, nT = T.length;
   const hrs = t => new Date(+t.slice(0, 4), +t.slice(5), 0).getDate() * 24;
@@ -1161,18 +1121,8 @@ V.powerNR = function () {
     `<tr class="sum"><td>소계</td><td>${f0(totP)}</td><td>${f0(totR)}</td><td>${f0(totR - totP)}</td><td>${pct(totR / totP - 1)}</td><td>100%</td></tr>`]);
   const solar = tt.find(x => x[0] === '태양광');
   $('#nr-n5').textContent = `태양광이 신재생의 ${solar ? (solar[1] / totR * 100).toFixed(0) : '–'}%를 차지합니다. 유형별 합은 월보 에너지원 합계(위 차트의 신재생)보다 조금 작아 그 차이를 회색으로 두었습니다. 수력은 일반수력과 소수력이고 양수는 뺐습니다.`;
-  $('#nr-method').innerHTML = `<h2>읽는 방법과 예측 모델</h2><ul>
-    <li><b>발전원별 증감</b>은 월보 9번 에너지원별 발전량(<code>source_gen</code>)의 월별 값을 전년 같은 달과 뺀 것입니다. 연도별 월 비교 차트의 점선 예측은 <b>계절 나이브 + 최근 3개월 성장률 보정</b>(예측 = 전년 같은 달 × 최근 3개월 전년 동기 대비)입니다. 자세한 설명은 "발전5사 배출 전망"의 예측 모델 항목과 같습니다.</li>
-    <li>원전은 정비 일정이 발전량을 크게 좌우하는데 이 모델은 정비 일정을 모릅니다. 최근 3개월에 장기 정비가 걸려 있으면 예측이 낮게, 정비가 막 끝났으면 높게 나올 수 있습니다.</li>
-    <li><b>이용률</b>은 월보 7-2 발전소별 발전량(<code>plant_gen</code>, 한수원 호기별)을 단지로 묶고 월보 3-1 설비용량(<code>plant_capacity</code>)으로 나눈 값입니다. 발전소별 시계열은 2024-01부터만 있습니다.</li>
-    <li><b>신재생 유형</b>은 7-2의 대체에너지 항목(태양광, 풍력, 연료전지, 바이오에너지·바이오중유, 기타)과 수력(일반·소수력)을 묶은 것입니다. 회사별 구분이 되지 않는 한전계열 신재생 합산분도 같이 들어 있습니다.</li></ul>`;
-};
-function nucUtilTxt() {
-  const NR = D.nr, T = NR.t, nT = T.length, hrs = t => new Date(+t.slice(0, 4), +t.slice(5), 0).getDate() * 24, sites = ['한빛', '한울', '고리', '월성', '신고리·새울', '신월성', '신한울'];
-  const u = (a, b) => { let g = 0, c = 0; sites.forEach(s_ => { for (let i = a; i < b; i++) { const cap = NR.nuc[s_].cap[i]; if (cap) { g += NR.nuc[s_].gen[i]; c += cap * hrs(T[i]) / 1000; } } }); return c ? (g / c * 100).toFixed(0) : '–'; };
-  return {cur: u(nT - 12, nT), prev: nT >= 24 ? u(nT - 24, nT - 12) : '–'};
 }
-const pwDraw = () => { const v = pwView(); (v === 'b' ? V.power5 : v === 'c' ? V.powerNR : V.power)(); };
+const pwDraw = () => { (pwView() === 'b' ? V.power5 : V.power)(); };
 
 
 
