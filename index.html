@@ -73,6 +73,7 @@ td.l,th.l{text-align:left}
 thead th{position:sticky;top:0;background:var(--surface2);color:var(--ink2);font-weight:600;z-index:1}
 tbody tr:last-child td{border-bottom:0}
 tbody tr.click{cursor:pointer} tbody tr.click:hover{background:var(--surface2)}
+tbody tr.sel td{background:var(--surface2);font-weight:600}
 tr.sum td{font-weight:600;background:var(--surface2)}
 .pill{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:999px;border:1px solid var(--line);color:var(--ink2)}
 .pill.short{border-color:var(--crit);color:var(--crit)} .pill.long{border-color:var(--s1);color:var(--s1)}
@@ -189,6 +190,8 @@ footer{color:var(--ink3);font-size:12px;padding-block:0 32px}
     <div class="panel"><div class="phead"><div><h2 id="p5p-h"></h2><p class="sub" id="p5p-sub"></p></div>
       <div class="seg" id="p5p-f"><button data-v="cl" aria-pressed="true">석탄·LNG</button><button data-v="all" aria-pressed="false">전체</button></div></div>
       <div class="tblwrap"><table id="t-p5p"></table></div><p class="note" id="p5p-note"></p></div>
+    <div class="panel" id="p5-pd"><div class="phead"><div><h2 id="p5d-h"></h2><p class="sub" id="p5d-sub"></p></div></div>
+      <div class="chart short" id="c-p5d"></div><div class="tblwrap" style="max-height:none"><table id="t-p5d" class="compact"></table></div><p class="note">점선은 같은 방법(전년 같은 달 × 최근 3개월 전년 동기 대비)으로 만든 예측입니다.</p></div>
     <div class="panel"><h2>2026년 발전5사 수급 전망</h2><p class="sub">만톤. 행을 누르면 위 차트가 해당 발전사로 바뀝니다</p><div class="tblwrap" style="max-height:none"><table id="t-p5"></table></div><p class="note" id="p5-note"></p></div>
     <div class="grid2" style="align-items:start">
       <div class="panel"><h2>석탄 배출계수 확인</h2><p class="sub">연간 인증배출량에서 LNG분(발전량 × 0.38)을 뺀 뒤 석탄 발전량으로 나눈 값 (tCO₂/MWh)</p><div class="tblwrap" style="max-height:none"><table id="t-p5f" class="compact"></table></div></div>
@@ -873,9 +876,13 @@ V.power5 = function () {
   const rowsP = plants.map(r => { const y12 = sum(r.v.slice(-12)), prev = sum(r.v.slice(-24, -12)), k = fuelOf(r.cat); return {r, y12, prev, em: k === 'coal' ? y12 * 1000 * fOf(r.co) : k === 'lng' ? y12 * 1000 * LNGF : 0}; }).sort((a, b) => b.y12 - a.y12);
   $('#p5p-h').textContent = (cur.nm === '합계' ? '발전5사' : cur.nm) + ' 발전소별 발전량';
   $('#p5p-sub').textContent = `${PL.t[0]} ~ ${PL.t[nP - 1]} 월별 발전량(GWh), 최근 12개월 합계 순. 추정 배출은 최근 12개월 발전량에 위 석탄·LNG 계수를 곱한 값(만톤)`;
+  const pk = r_ => r_.co + '|' + r_.name;
+  if (!rowsP.some(x => pk(x.r) === p5Plant)) p5Plant = rowsP.length ? pk(rowsP[0].r) : null;
+  $('#p5p-sub').textContent += '. 행을 누르면 아래에 연도별 비교가 나옵니다';
   table('t-p5p', ['발전소', '회사', '구분', PL.t[nP - 1], '전년 동월', '최근 12개월', '전년 대비', '추정 배출', '추이'], rowsP.map(({r, y12, prev, em}) =>
-    [r.name, r.co, r.cat, f0(r.v[nP - 1]), f0(r.v[nP - 13]), f0(y12), prev > 0 ? pct(y12 / prev - 1) : '–', em ? man1(em) : '–', spark(r.v)]));
-  document.querySelectorAll('#t-p5p td:nth-child(2),#t-p5p td:nth-child(3),#t-p5p th:nth-child(2),#t-p5p th:nth-child(3)').forEach(td => td.classList.add('l'));
+    `<tr class="click${pk(r) === p5Plant ? ' sel' : ''}" data-pk="${pk(r)}"><td>${r.name}</td><td class="l">${r.co}</td><td class="l">${r.cat}</td><td>${f0(r.v[nP - 1])}</td><td>${f0(r.v[nP - 13])}</td><td>${f0(y12)}</td><td>${prev > 0 ? pct(y12 / prev - 1) : '–'}</td><td>${em ? man1(em) : '–'}</td><td>${spark(r.v)}</td></tr>`));
+  document.querySelectorAll('#t-p5p th:nth-child(2),#t-p5p th:nth-child(3)').forEach(th => th.classList.add('l'));
+  plantDetail(rowsP.find(x => pk(x.r) === p5Plant));
   $('#p5p-note').textContent = `발전소별 값은 전력통계월보 7-2(한전계열)와 3-1 설비 매핑 기준이라 회사 합계와 약간 다를 수 있습니다. 발전소별 배출은 회사 단위로 보정한 계수를 그대로 쓴 추정이며 실측이 아닙니다.`;
 
   // 표: 발전5사 수급
@@ -916,6 +923,24 @@ V.power5 = function () {
 };
 ['p5-coal', 'p5-lng', 'p5-paid', 'p5-alloc'].forEach(id => document.getElementById(id).addEventListener('input', () => V.power5()));
 $('#t-p5').addEventListener('click', e => { const tr = e.target.closest('tr[data-n]'); if (tr) { p5Name = tr.dataset.n; V.power5(); } });
+let p5Plant = null;
+function plantDetail(x) {
+  const box = $('#p5-pd'); box.hidden = !x; if (!x) return;
+  const PL = D.power.plants, nP = PL.t.length, a = x.r.v.map(v => v || 0), lastP = PL.t[nP - 1], yP = +lastP.slice(0, 4), mP = +lastP.slice(5), hP = 12 - mP;
+  const years = [...new Set(PL.t.map(t => +t.slice(0, 4)))], at = (y, m) => { const i = PL.t.indexOf(`${y}-${String(m).padStart(2, '0')}`); return i < 0 ? null : Math.round(a[i]); };
+  const fc = hP ? fcm(a, nP - 1, hP).map(Math.round) : [], col = i => [css('--ghost'), S(4), S(1)][i + 3 - years.length] || css('--ghost');
+  $('#p5d-h').textContent = `${x.r.name} 월별 발전량: 연도별 비교`;
+  $('#p5d-sub').textContent = `${x.r.co} · ${x.r.cat} · GWh. ${lastP}까지 실적, 이후 ${hP}개월은 예측`;
+  const series = years.map((y, i) => ln(y + '년', [...Array(12)].map((_, m) => at(y, m + 1)), col(i), {symbolSize: y === yP ? 7 : 5, lineStyle: {width: y === yP ? 3 : 2, color: col(i)}}));
+  if (hP) series.push(ln(yP + '년 예측', [...Array(12)].map((_, m) => m + 1 === mP ? at(yP, mP) : m + 1 > mP ? fc[m - mP] : null), col(years.length - 1), {lineStyle: {width: 2.5, type: 'dashed', color: col(years.length - 1)}, symbol: 'emptyCircle', symbolSize: 7}));
+  draw('c-p5d', {xAxis: cat([...Array(12)].map((_, m) => (m + 1) + '월')), yAxis: val({scale: true}), series});
+  const row = (lbl, f) => [lbl, ...[...Array(12)].map((_, m) => f(m + 1)), '']; 
+  const rows = years.map(y => { const v = [...Array(12)].map((_, m) => at(y, m + 1)); return [y + '년', ...v.map(f0), f0(sum(v.map(z => z || 0)))]; });
+  if (hP) { const v = [...Array(12)].map((_, m) => m + 1 <= mP ? at(yP, m + 1) : fc[m - mP]); rows.push(`<tr class="sum"><td>${yP}년 (예측 포함)</td>${v.map(z => `<td>${f0(z)}</td>`).join('')}<td>${f0(sum(v))}</td></tr>`); }
+  rows.push(['전년 대비 ' + yP, ...[...Array(12)].map((_, m) => { const c = at(yP, m + 1), p = at(yP - 1, m + 1); return c != null && p ? pct(c / p - 1, 0) : '–'; }), '']);
+  table('t-p5d', ['', ...[...Array(12)].map((_, m) => (m + 1) + '월'), '합계'], rows);
+}
+$('#t-p5p').addEventListener('click', e => { const tr = e.target.closest('tr[data-pk]'); if (tr) { p5Plant = tr.dataset.pk; V.power5(); } });
 const p5pF = seg('p5p-f', () => V.power5());
 const pwView = seg('pw-view', v => { $('#pw-a').style.display = v === 'a' ? 'contents' : 'none'; $('#pw-b').style.display = v === 'b' ? 'flex' : 'none'; (v === 'a' ? V.power : V.power5)(); });
 
