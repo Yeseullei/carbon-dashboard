@@ -186,6 +186,9 @@ footer{color:var(--ink3);font-size:12px;padding-block:0 32px}
       <div class="panel"><h2>연도별 배출량과 확보량</h2><p class="sub">막대: 인증배출량(2026은 예상), 선: 확보량(무상할당 + 이월). 만톤</p><div class="chart" id="c-p51"></div></div>
       <div class="panel"><h2>월별 석탄·LNG 발전량</h2><p class="sub">GWh. 점선은 예측</p><div class="chart" id="c-p52"></div></div>
     </div>
+    <div class="panel"><div class="phead"><div><h2 id="p5p-h"></h2><p class="sub" id="p5p-sub"></p></div>
+      <div class="seg" id="p5p-f"><button data-v="cl" aria-pressed="true">석탄·LNG</button><button data-v="all" aria-pressed="false">전체</button></div></div>
+      <div class="tblwrap"><table id="t-p5p"></table></div><p class="note" id="p5p-note"></p></div>
     <div class="panel"><h2>2026년 발전5사 수급 전망</h2><p class="sub">만톤. 행을 누르면 위 차트가 해당 발전사로 바뀝니다</p><div class="tblwrap" style="max-height:none"><table id="t-p5"></table></div><p class="note" id="p5-note"></p></div>
     <div class="grid2" style="align-items:start">
       <div class="panel"><h2>석탄 배출계수 확인</h2><p class="sub">연간 인증배출량에서 LNG분(발전량 × 0.38)을 뺀 뒤 석탄 발전량으로 나눈 값 (tCO₂/MWh)</p><div class="tblwrap" style="max-height:none"><table id="t-p5f" class="compact"></table></div></div>
@@ -863,6 +866,18 @@ V.power5 = function () {
     cur[f].length ? ln(nmk + ' 예측', [...padn(n5 - 1), Math.round(serie(k)[n5 - 1]), ...cur[f].map(Math.round)], c, {lineStyle: {width: 2, type: 'dashed', color: c}, symbol: 'emptyCircle', symbolSize: 5}) : null].filter(Boolean);
   draw('c-p52', {xAxis: cat(ext), yAxis: val({scale: true}), series: [...mk('coal', 'cf', S(2), '석탄'), ...mk('lng', 'lf', S(3), 'LNG')]});
 
+  // 표: 선택한 회사의 발전소별 발전량과 추이
+  const PL = D.power.plants, nP = PL.t.length, fuelOf = c_ => /유연탄|무연탄|^석탄$/.test(c_) ? 'coal' : /LNG|^가스$/.test(c_) ? 'lng' : '';
+  const plants = PL.rows.filter(r => (cur.nm === '합계' ? G5N.includes(r.co) : r.co === cur.nm) && (p5pF() === 'all' || fuelOf(r.cat)));
+  const fOf = co_ => (P.find(x => x.nm === co_) || {f: 0}).f;
+  const rowsP = plants.map(r => { const y12 = sum(r.v.slice(-12)), prev = sum(r.v.slice(-24, -12)), k = fuelOf(r.cat); return {r, y12, prev, em: k === 'coal' ? y12 * 1000 * fOf(r.co) : k === 'lng' ? y12 * 1000 * LNGF : 0}; }).sort((a, b) => b.y12 - a.y12);
+  $('#p5p-h').textContent = (cur.nm === '합계' ? '발전5사' : cur.nm) + ' 발전소별 발전량';
+  $('#p5p-sub').textContent = `${PL.t[0]} ~ ${PL.t[nP - 1]} 월별 발전량(GWh), 최근 12개월 합계 순. 추정 배출은 최근 12개월 발전량에 위 석탄·LNG 계수를 곱한 값(만톤)`;
+  table('t-p5p', ['발전소', '회사', '구분', PL.t[nP - 1], '전년 동월', '최근 12개월', '전년 대비', '추정 배출', '추이'], rowsP.map(({r, y12, prev, em}) =>
+    [r.name, r.co, r.cat, f0(r.v[nP - 1]), f0(r.v[nP - 13]), f0(y12), prev > 0 ? pct(y12 / prev - 1) : '–', em ? man1(em) : '–', spark(r.v)]));
+  document.querySelectorAll('#t-p5p td:nth-child(2),#t-p5p td:nth-child(3),#t-p5p th:nth-child(2),#t-p5p th:nth-child(3)').forEach(td => td.classList.add('l'));
+  $('#p5p-note').textContent = `발전소별 값은 전력통계월보 7-2(한전계열)와 3-1 설비 매핑 기준이라 회사 합계와 약간 다를 수 있습니다. 발전소별 배출은 회사 단위로 보정한 계수를 그대로 쓴 추정이며 실측이 아닙니다.`;
+
   // 표: 발전5사 수급
   const hd = ['발전사', `${YR - 1} 배출`, `${YR} 사전할당`, `${YR - 1} 이월`, '확보량', '석탄 배출', 'LNG 배출', `${YR} 예상 배출`, '전년 대비', '부족', '부족률', '유상 구입분', '유상 구입 후'];
   table('t-p5', hd, all.map(x => `<tr class="click${x.nm === '합계' ? ' sum' : ''}" data-n="${x.nm}"><td>${x.nm === '합계' ? '5개사 합계' : x.nm}</td><td>${man(x.em0)}</td><td>${man(x.pre)}</td><td>${man(x.carry)}</td><td>${man(x.secured)}</td><td>${man(x.eC)}</td><td>${man(x.eL)}</td><td>${man(x.em)}</td><td>${pct(x.em / x.em0 - 1)}</td><td class="${x.short > 0 ? 'up' : 'dn'}">${man(x.short)}</td><td>${(x.short / x.secured * 100).toFixed(0)}%</td><td>${man(x.paid)}</td><td class="${x.net > 0 ? 'up' : 'dn'}">${man(x.net)}</td></tr>`));
@@ -901,6 +916,7 @@ V.power5 = function () {
 };
 ['p5-coal', 'p5-lng', 'p5-paid', 'p5-alloc'].forEach(id => document.getElementById(id).addEventListener('input', () => V.power5()));
 $('#t-p5').addEventListener('click', e => { const tr = e.target.closest('tr[data-n]'); if (tr) { p5Name = tr.dataset.n; V.power5(); } });
+const p5pF = seg('p5p-f', () => V.power5());
 const pwView = seg('pw-view', v => { $('#pw-a').style.display = v === 'a' ? 'contents' : 'none'; $('#pw-b').style.display = v === 'b' ? 'flex' : 'none'; (v === 'a' ? V.power : V.power5)(); });
 
 /* ── 탭 전환 · 테마 · 리사이즈 ─────────────────────────── */
