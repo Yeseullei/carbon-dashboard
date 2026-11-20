@@ -245,7 +245,7 @@ footer{color:var(--ink3);font-size:12px;padding-block:0 32px}
       <div class="sl"><div class="row"><label for="fc-g">배출량 연 증감률</label><b id="fc-g-o"></b></div><input type="range" id="fc-g" min="-6" max="2" step="0.1" value="-1.5"><p class="note" id="fc-g-n"></p></div>
       <div class="sl"><div class="row"><label for="fc-res">총량 내 예비분 공급 비율</label><b id="fc-res-o"></b></div><input type="range" id="fc-res" min="0" max="100" step="5" value="50"><p class="note">배출허용총량 − 사전할당량 중 시장에 풀리는 비율</p></div>
       <div class="sl"><div class="row"><label for="fc-kcu">상쇄배출권(KCU) 전환</label><b id="fc-kcu-o"></b></div><input type="range" id="fc-kcu" min="0" max="10" step="0.5" value="2"><p class="note">연간, 백만 톤. 3차 평균 3.8</p></div>
-      <div class="sl"><div class="row"><label for="fc-cap">가격 상단</label><b id="fc-cap-o"></b></div><input type="range" id="fc-cap" min="30000" max="150000" step="1000"><p class="note" id="fc-cap-n"></p></div>
+      <div class="sl"><div class="row"><label for="fc-cap">가격 상단 (직전 2년 평균의 몇 배)</label><b id="fc-cap-o"></b></div><input type="range" id="fc-cap" min="1.5" max="6" step="0.1" value="3"><p class="note" id="fc-cap-n"></p></div>
       <div class="sl"><div class="row"><span>가격 관계식 표본</span></div>
         <div class="seg" id="fc-fit"><button data-v="p23" aria-pressed="true">2018–2024</button><button data-v="all">2015–2025 전체</button></div><p class="note" id="fc-fit-n"></p></div>
     </div>
@@ -691,23 +691,30 @@ function project(p) {            // p: {g(%/yr), res(0..1), kcu(Mt)}
   }
   return rows;
 }
-function pricePath(rows, fit, p0, cap, floor) {   // 현재가에서 출발해 계획기간 말 수급 내재가격으로 수렴, 상단 적용
-  const rEnd = last(rows).r, rStar = (Math.log(p0) - fit.a) / fit.b, n = rows.length - 1;
+// 시장안정화 조치 발동 기준(시행령 제38조제3항제1호): 가격이 최근 2년 평균의 3배 이상이거나 70% 이하. 평균이 움직이므로 상단과 하단도 해마다 다시 계산한다.
+const AVG2Y = (() => { const d = new Date(last(PX.d)); d.setFullYear(d.getFullYear() - 2); const c = d.toISOString().slice(0, 10);
+  const a = PX.p.filter((_, i) => PX.d[i] > c); return sum(a) / a.length; })();
+const FMULT = 0.7;
+const AM = (() => { const o = {}, c = {}; PX.d.forEach((d, i) => { const y = +d.slice(0, 4); o[y] = (o[y] || 0) + PX.p[i]; c[y] = (c[y] || 0) + 1; }); Object.keys(o).forEach(y => o[y] /= c[y]); return o; })();
+function pricePath(rows, fit, p0, mult) {   // 현재가에서 출발해 계획기간 말 수급 내재가격으로 수렴, 해마다 롤링 상·하단 적용
+  const rEnd = last(rows).r, rStar = (Math.log(p0) - fit.a) / fit.b, n = rows.length - 1, y0 = rows[0].y;
   const w = Math.min(1, Math.max(0, (rows[0].r - rStar) / ((rows[0].r - rEnd) || 1e-9)));
   const model = r => Math.exp(fit.a + fit.b * ((1 - w) * r + w * rEnd));
   const resid = Math.log(p0) - Math.log(model(rows[0].r));
   const raw = rows.map((x, i) => model(x.r) * Math.exp(resid * (n - i) / n)), rawMy = rows.map(x => Math.exp(fit.a + fit.b * x.r));
-  return {w, rStar, resid, raw, px: raw.map(v => Math.max(floor, Math.min(cap, v))), hit: raw.map(v => v > cap || v < floor), myopic: rawMy.map(v => Math.min(cap, v)), myHit: rawMy.map(v => v > cap), rawMy};
+  const px = [], cap = [], floor = [], ref = [];
+  const A = (y) => y <= y0 ? (AM[y] ?? p0) : (px[y - y0 - 1] + px[y - y0]) / 2;     // 연평균: 지난 해는 실제 일별 종가 평균, 예측 연도는 연초·연말 가격의 중간값
+  rows.forEach((x, i) => {
+    ref[i] = i === 0 ? AVG2Y : (A(x.y - 1) + A(x.y - 2)) / 2;                         // 올해는 오늘 기준 최근 2년 평균, 이후는 직전 두 해 연평균의 평균
+    cap[i] = Math.max(mult * ref[i], i === 0 ? p0 : 0); floor[i] = FMULT * ref[i];
+    px[i] = i === 0 ? p0 : Math.max(floor[i], Math.min(cap[i], raw[i]));
+  });
+  return {w, rStar, resid, raw, px, cap, floor, ref, hit: raw.map((v, i) => i > 0 && (v > cap[i] || v < floor[i])), myopic: rawMy.map((v, i) => Math.min(cap[i], v)), myHit: rawMy.map((v, i) => v > cap[i]), rawMy};
 }
-// 시장안정화 조치 발동 기준: 최근 2년 평균 가격의 3배 (시행령 제38조제3항제1호)
-const AVG2Y = (() => { const d = new Date(last(PX.d)); d.setFullYear(d.getFullYear() - 2); const c = d.toISOString().slice(0, 10);
-  const a = PX.p.filter((_, i) => PX.d[i] > c); return sum(a) / a.length; })();
-const CAP0 = Math.round(AVG2Y * 3 / 1000) * 1000, FLOOR0 = Math.round(AVG2Y * 0.7 / 100) * 100;
-$('#fc-cap').value = CAP0;
 V.forecast = function () {
-  const p = {g: +$('#fc-g').value, res: +$('#fc-res').value / 100, kcu: +$('#fc-kcu').value}, cap = Math.max(+$('#fc-cap').value, last(PX.p));
-  $('#fc-cap-o').textContent = f0(cap) + '원';
-  $('#fc-cap-n').textContent = `기본값 ${f0(CAP0)}원 = 최근 2년 평균 종가 ${f0(AVG2Y)}원의 3배 (시장안정화 조치 발동 기준). 하단은 평균의 70%인 ${f0(FLOOR0)}원으로 고정`;
+  const p = {g: +$('#fc-g').value, res: +$('#fc-res').value / 100, kcu: +$('#fc-kcu').value}, mult = +$('#fc-cap').value;
+  $('#fc-cap-o').textContent = mult.toFixed(1) + '배';
+  $('#fc-cap-n').textContent = `시행령 제38조 기준은 3배. 상단과 하단 모두 해마다 직전 2년 평균에서 다시 계산합니다(하단은 ${FMULT}배 고정). 올해 기준 평균은 최근 2년 일별 종가 ${f0(AVG2Y)}원`;
   $('#fc-g-o').textContent = (p.g > 0 ? '+' : '') + p.g.toFixed(1) + '% / 년';
   $('#fc-res-o').textContent = (p.res * 100).toFixed(0) + '%';
   $('#fc-kcu-o').textContent = p.kcu.toFixed(1) + '백만 톤';
@@ -715,14 +722,15 @@ V.forecast = function () {
   $('#fc-g-n').textContent = `2021–2025 실적은 연 ${(cagr*100).toFixed(1)}%`;
   const key = fcFit(), fit = D.fit[key], alt = D.fit[key === 'p23' ? 'all' : 'p23'];
   $('#fc-fit-n').textContent = `ln(가격) = ${fit.a.toFixed(2)} ${fit.b.toFixed(2)} × 여유율 · R² ${fit.r2} · 표본 ${fit.n}개`;
-  const rows = project(p), p0 = last(PX.p), A = pricePath(rows, fit, p0, cap, FLOOR0), B = pricePath(rows, alt, p0, cap, FLOOR0);
+  const rows = project(p), p0 = last(PX.p), A = pricePath(rows, fit, p0, mult), B = pricePath(rows, alt, p0, mult);
+  const pMax = Math.max(...PX.p), dMax = PX.d[PX.p.indexOf(pMax)];
   const lo = rows.map((_, i) => Math.min(A.px[i], B.px[i])), hi = rows.map((_, i) => Math.max(A.px[i], B.px[i]));
   const e = last(rows), firstShort = rows.find(x => x.surplus < 0);
   const rObs = SD.years.map(y => sdv('여유분', y) / -sdv('인증배출량', y)), rMin = Math.min(...rObs);
   let gl = -10, gh = 5; for (let k = 0; k < 40; k++) { const gm = (gl + gh) / 2; last(project({g: gm, res: p.res, kcu: p.kcu})).surplus > 0 ? gl = gm : gh = gm; }
   const capHit = A.hit.findIndex(Boolean);
   $('#fc-tiles').innerHTML =
-    tile('2030 시나리오 가격', `${f0(r100(last(A.px)))}<small>원</small>`, (last(A.hit) ? `<span class="pill warn">${last(A.raw) > cap ? '상단' : '하단'} 적용</span> ` : '') + `범위 ${f0(r100(last(lo)))} ~ ${f0(r100(last(hi)))}원 · 현재가 대비 ${pct(last(A.px)/p0 - 1, 0)}`) +
+    tile('2030 시나리오 가격', `${f0(r100(last(A.px)))}<small>원</small>`, (last(A.hit) ? `<span class="pill warn">${last(A.raw) > last(A.cap) ? '상단' : '하단'} 적용</span> ` : '') + (last(A.px) > pMax ? '<span class="pill warn">과거 최고가 초과</span> ' : '') + `범위 ${f0(r100(last(lo)))} ~ ${f0(r100(last(hi)))}원 · 현재가 대비 ${pct(last(A.px)/p0 - 1, 0)}`) +
     tile('2030 말 여유분', `${f1(e.surplus)}<small>백만 KAU</small>`, (e.surplus < 0 ? '<span class="pill short">부족</span>' : '<span class="pill long">잉여</span>') + ` 여유율 ${(e.r*100).toFixed(1)}%` + (firstShort ? ` · ${firstShort.y}년부터 부족` : '')) +
     tile('수급이 맞는 배출 경로', `${gl > 0 ? '+' : ''}${gl.toFixed(1)}<small>% / 년</small>`, `배출량이 이보다 빨리 줄어야 2030년까지 여유분이 남음 (가정 ${p.g > 0 ? '+' : ''}${p.g.toFixed(1)}%)`) +
     tile('현재가에 내재된 여유율', `${(A.rStar*100).toFixed(1)}<small>%</small>`, `시나리오 2030 여유율 ${(e.r*100).toFixed(1)}%보다 ${A.rStar < e.r ? '낮음: 시장이 더 타이트하게 봄' : '높음: 시장이 덜 타이트하게 봄'}`);
@@ -737,7 +745,10 @@ V.forecast = function () {
       ln('실적 (종목 평균)', [...hpx, ...fy.map(() => null)], css('--ink2')),
       {name: '범위', type: 'line', data: [...pad, ...lo.map(r100)], stack: 'band', lineStyle: {opacity: 0}, symbol: 'none', silent: true, legendHoverLink: false},
       {name: '범위', type: 'line', data: [...pad, ...hi.map((v, i) => r100(v) - r100(lo[i]))], stack: 'band', lineStyle: {opacity: 0}, symbol: 'none', areaStyle: {color: S(1), opacity: .18}, itemStyle: {color: S(1), opacity: .3}, silent: true},
+      ln('가격 상단 (롤링)', [...pad, ...A.cap.map(r100)], css('--ink3'), {symbol: 'none', lineStyle: {width: 1.5, type: 'dashed', color: css('--ink3')}}),
+      ln('가격 하단 (롤링)', [...pad, ...A.floor.map(r100)], css('--ink3'), {symbol: 'none', lineStyle: {width: 1.5, type: 'dotted', color: css('--ink3')}}),
       ln('시나리오 경로', [...pad, ...A.px.map(r100)], S(1), {lineStyle: {width: 3, color: S(1)}, symbolSize: 8,
+        markLine: {silent: true, symbol: 'none', lineStyle: {color: css('--ink3'), type: 'dotted'}, label: {formatter: `과거 최고 종가 ${f0(pMax)}`, color: css('--ink2'), fontSize: 11, position: 'insideStartTop'}, data: [{yAxis: pMax}]},
         label: {show: true, position: 'top', color: css('--ink'), fontSize: 11, formatter: q => q.dataIndex === ax.length - 1 || q.dataIndex === hy.length ? f0(q.value) : ''}}),
     ]});
 
@@ -762,7 +773,7 @@ V.forecast = function () {
         label: {show: true, formatter: q => "'" + q.data[2].slice(3), position: 'right', color: css('--ink2'), fontSize: 10.5}},
       {name: '시나리오 (당해 수급만 반영)', type: 'scatter', data: rows.map((x, i) => [+(x.r * 100).toFixed(2), Math.round(A.myopic[i]), x.y + ' 시나리오']), symbol: 'diamond', symbolSize: 11, itemStyle: {color: S(2), borderColor: css('--surface'), borderWidth: 1.5},
         label: {show: true, formatter: q => "'" + q.data[2].slice(2, 4), position: 'left', color: css('--ink2'), fontSize: 10.5},
-        markLine: {silent: true, symbol: 'none', lineStyle: {color: S(8), type: 'dotted'}, label: {formatter: '현재가 ' + f0(p0), color: css('--ink2'), fontSize: 11, position: 'insideEndTop'}, data: [{yAxis: p0}, {yAxis: cap, label: {formatter: '가격 상단 ' + f0(cap)}}]}},
+        markLine: {silent: true, symbol: 'none', lineStyle: {color: S(8), type: 'dotted'}, label: {formatter: '현재가 ' + f0(p0), color: css('--ink2'), fontSize: 11, position: 'insideEndTop'}, data: [{yAxis: p0}]}},
     ]});
 
   table('t-fc', ['', ...fy], [
@@ -771,9 +782,10 @@ V.forecast = function () {
     `<tr class="sum"><td>여유분</td>${rows.map(x => `<td>${f1(x.surplus)}</td>`).join('')}</tr>`,
     ['여유율', ...rows.map(x => (x.r*100).toFixed(1) + '%' + (x.r < rMin ? ' †' : ''))],
     ['당해 수급만 반영한 가격 (원)', ...A.myopic.map((v, i) => f0(r100(v)) + (A.myHit[i] ? ' ‡' : ''))],
-    `<tr class="sum"><td>시나리오 가격 (원)</td>${A.px.map((v, i) => `<td>${f0(r100(v))}${A.hit[i] ? ' ‡' : ''}</td>`).join('')}</tr>`,
-    ['범위 (원)', ...rows.map((_, i) => `${f0(r100(lo[i]))} ~ ${f0(r100(hi[i]))}`)]]);
-  $('#fc-note').innerHTML = `† 과거 관측 범위(여유율 최저 ${(rMin*100).toFixed(1)}%) 밖이라 관계식을 외삽한 값. ‡ 관계식 값이 가격 상단 ${f0(cap)}원을 넘거나 하단 ${f0(FLOOR0)}원 아래라 상·하단으로 대체한 값` + (capHit >= 0 ? `. 이 가정에서는 ${rows[capHit].y}년부터 ${A.raw[capHit] > cap ? '상단에 닿습니다. 추가 감축이나 예비분 공급 없이는 유지되기 어려운 배출 경로라는 뜻입니다' : '하단에 닿습니다. 관측된 적 없는 수준의 공급 과잉이라는 뜻입니다'}.` : '.');
+    `<tr class="sum"><td>시나리오 가격 (원)</td>${A.px.map((v, i) => `<td>${f0(r100(v))}${A.hit[i] ? ' ‡' : ''}${v > pMax ? ' §' : ''}</td>`).join('')}</tr>`,
+    ['범위 (원)', ...rows.map((_, i) => `${f0(r100(lo[i]))} ~ ${f0(r100(hi[i]))}`)],
+    ['직전 2년 평균 가격 (원)', ...A.ref.map(v => f0(r100(v)))], ['가격 상단 (원)', ...A.cap.map(v => f0(r100(v)))], ['가격 하단 (원)', ...A.floor.map(v => f0(r100(v)))]]);
+  $('#fc-note').innerHTML = `† 과거 관측 범위(여유율 최저 ${(rMin*100).toFixed(1)}%) 밖이라 관계식을 외삽한 값. ‡ 관계식 값이 그해 가격 상단(${mult.toFixed(1)} × 직전 2년 평균)을 넘거나 하단(${FMULT} ×) 아래라 상·하단으로 대체한 값. § 과거 최고 종가 ${f0(pMax)}원(${dMax})을 넘는 값으로, 관측된 적 없는 가격 수준이라 참고만 하세요. 상단과 하단은 해마다 새로 계산하므로 표의 "가격 상단" 행이 해마다 달라집니다` + (capHit >= 0 ? `. 이 가정에서는 ${rows[capHit].y}년부터 ${A.raw[capHit] > A.cap[capHit] ? '상단에 닿습니다. 추가 감축이나 예비분 공급 없이는 유지되기 어려운 배출 경로라는 뜻입니다' : '하단에 닿습니다. 관측된 적 없는 수준의 공급 과잉이라는 뜻입니다'}.` : '.');
 
   // 산정 방법
   const P23 = D.fit.p23, ALL = D.fit.all, eq = f => `ln(가격) = ${f.a.toFixed(3)} − ${Math.abs(f.b).toFixed(3)} × 여유율`;
@@ -816,7 +828,13 @@ V.forecast = function () {
   </ul>
   <h3>가격 상단과 하단을 두는 이유</h3>
   <p>관계식은 여유율 ${(rMin*100).toFixed(1)}–${(Math.max(...rObs)*100).toFixed(1)}% 구간에서만 관측됐습니다. 이 구간을 크게 벗어난 시나리오에 로그선형 식을 그대로 연장하면 가격이 지수적으로 커지거나 0에 가까워집니다(현재 가정에서 제한이 없을 때 2030년 ${f0(r100(last(A.raw)))}원). 근거 없는 외삽이라 상단과 하단을 둡니다.</p>
-  <p>기본 상단 ${f0(CAP0)}원은 <b>최근 2년 평균 종가(${f0(AVG2Y)}원)의 3배</b>입니다. 배출권거래법 시행령 제38조제3항제1호는 가격이 6개월 연속 최근 2년 평균의 3배 이상이면 시장 안정화 조치를 할 수 있게 하고, 같은 조 제6항은 그 수단으로 일시적 최고가격 설정을 둡니다. 같은 호는 평균의 70% 이하일 때도 조치 대상으로 정하고 있어, 하단은 평균의 70%인 ${f0(FLOOR0)}원으로 두었습니다. 평균은 일별 종가 단순평균으로 계산했고, 가격이 오르면 이 기준도 함께 오르므로 상단은 슬라이더로 바꿔 볼 수 있습니다.</p>
+  <p><b>상단과 하단은 고정값이 아니라 해마다 다시 계산합니다.</b> 시행령 제38조제3항제1호는 가격이 6개월 연속 <b>최근 2년 평균</b>의 3배 이상이거나 70% 이하일 때 시장 안정화 조치를 할 수 있게 하고, 같은 조 제6항은 그 수단으로 일시적 최고가격 설정을 둡니다. 기준이 되는 평균이 움직이므로 가격이 오르면 상단도 따라 오릅니다.</p>
+  <div class="fx">그해 상단 = ${mult.toFixed(1)} × 직전 2년 평균,   하단 = ${FMULT} × 직전 2년 평균
+2026년의 직전 2년 평균 = 오늘까지 최근 2년 일별 종가 평균 (${f0(AVG2Y)}원)
+2027년부터 = (전년 연평균 + 전전년 연평균) ÷ 2</div>
+  <ul><li>연평균은 지난 해는 실제 일별 종가의 평균입니다(2025년 ${f0(AM[2025] || 0)}원, 2026년 1월부터 오늘까지 ${f0(AM[2026] || 0)}원). 예측 연도는 그 해 연초와 연말 시나리오 가격의 중간값을 씁니다. 시나리오 가격이 오르면 다음 해 상단도 오르는 순환이 이렇게 반영됩니다.</li>
+  <li>이 가정에서 상단은 ${rows.map((x, i) => `${x.y}년 ${f0(r100(A.cap[i]))}원`).join(', ')}이고 하단은 ${rows.map((x, i) => `${x.y}년 ${f0(r100(A.floor[i]))}원`).join(', ')}입니다. 기준 배수(상단 ${mult.toFixed(1)}배)는 슬라이더로 바꿔 볼 수 있습니다.</li>
+  <li>실제 조항은 "6개월 연속" 조건이어서 가격이 한두 달 상단을 넘었다고 조치가 나오지는 않고, 조치도 최고가격 설정으로 정해져 있지 않습니다(예비분 공급, 보유한도 등 다른 수단도 있음). 여기서는 상단을 상시 가격 한도로 단순화했습니다.</li></ul>
   <h3>한계</h3>
   <ul>
     <li>관측치가 ${P23.n}–${ALL.n}개뿐이라 계수의 불확실성이 큽니다. 두 표본의 기울기가 ${Math.abs(P23.b).toFixed(1)}과 ${Math.abs(ALL.b).toFixed(1)}로 두 배 이상 다릅니다.</li>
