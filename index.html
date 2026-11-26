@@ -896,34 +896,42 @@ function plantSeries(name) {
 }
 const coalFactor = () => sum(G5N.map(nm => calib5(nm, CAL_YEARS))) / G5N.length;
 function fuelFactor(cat) { return /석탄/.test(cat) ? coalFactor() : /LNG/.test(cat) ? LNGF : null; }
-let coPlant = '__all';
+// 보유 발전소의 발전량 기반 추정 배출 (지난 해는 실적, 올해는 실적 + 남은 달 예측)
+function coPlantEst(c) {
+  const PL = D.power.plants, T = PL.t, nP = T.length, list = c.plants.map(plantSeries).filter(Boolean), lastY = +T[nP - 1].slice(0, 4), mm = +T[nP - 1].slice(5), h = 12 - mm, fullY = lastY - 1;
+  const yrSum = (x, y) => sum(x.v.filter((_, i) => T[i].startsWith(String(y))).map(z => z || 0));
+  const rows = list.map(x => { const a = x.v.map(z => z || 0), f = fuelFactor(x.cat), g25 = yrSum(x, fullY), g26 = yrSum(x, lastY) + (h ? sum(fcm(a, nP - 1, h)) : 0);
+    return {x, f, g12: sum(a.slice(-12)), p12: sum(a.slice(-24, -12)), g25, g26, e25: f == null ? null : g25 * 1000 * f, e26: f == null ? null : g26 * 1000 * f}; });
+  const all = k => rows.every(o => o[k] != null) ? sum(rows.map(o => o[k])) : null;
+  return {list, T, nP, lastY, fullY, h, mm, rows, e25: all('e25'), e26: all('e26'), g26: sum(rows.map(o => o.g26))};
+}
 function coPlants(c) {
-  const PL = D.power.plants, T = PL.t, nP = T.length, list = c.plants.map(plantSeries).filter(Boolean);
-  if (!list.length) { $('#co-pl-note').textContent = '월보에서 이 기업의 발전소 발전량을 찾지 못했습니다.'; return; }
-  const all = {name: '합계', v: T.map((_, i) => sum(list.map(x => x.v[i] || 0))), cat: ''};
-  const sel = $('#co-pl'); if (!sel.options.length) { sel.innerHTML = [`<option value="__all">합계</option>`, ...list.map(x => `<option>${x.name}</option>`)].join(''); sel.value = '__all'; sel.onchange = () => { coPlant = sel.value; coPlants(c); }; }
-  const cur = sel.value === '__all' ? all : (list.find(x => x.name === sel.value) || all);
+  const PE = coPE, T = PE.T;
+  if (!PE.list.length) { $('#co-pl-note').textContent = '월보에서 이 기업의 발전소 발전량을 찾지 못했습니다.'; return; }
+  const all = {name: '합계', v: T.map((_, i) => sum(PE.list.map(x => x.v[i] || 0))), cat: ''};
+  const sel = $('#co-pl'); if (!sel.options.length) { sel.innerHTML = [`<option value="__all">합계</option>`, ...PE.list.map(x => `<option>${x.name}</option>`)].join(''); sel.value = '__all'; sel.onchange = () => coPlants(c); }
+  const cur = sel.value === '__all' ? all : (PE.list.find(x => x.name === sel.value) || all);
   const r = yoyBlock('c-co4', 't-co4', cur.v);
   $('#co-pl-sub').textContent = `${cur.name} · GWh. ${r.lastP}까지 실적, 이후 ${r.hP}개월은 예측 (계절 나이브 + 최근 3개월 성장률 보정)`;
-  const yrSum = (x, y) => sum(x.v.filter((_, i) => T[i].startsWith(String(y))).map(z => z || 0));
-  const lastY = +T[nP - 1].slice(0, 4), fullY = lastY - 1;
-  const emRef = y => { const e = emOf(c, y); return e ? e.v : null; };
-  const rowsT = list.map(x => { const g12 = sum(x.v.slice(-12).map(z => z || 0)), p12 = sum(x.v.slice(-24, -12).map(z => z || 0)), f = fuelFactor(x.cat), gy = yrSum(x, fullY);
-    return {x, g12, p12, f, gy, est: f == null ? null : gy * 1000 * f}; });
-  const estAll = rowsT.every(o => o.est != null) ? sum(rowsT.map(o => o.est)) : null, ref = emRef(fullY);
-  table('t-co5', ['발전소', '구분', '최근 12개월 (GWh)', '직전 12개월', '증감', `${fullY}년 발전량`, `${fullY}년 추정 배출 (천 톤)`, '추이'], rowsT.map(o => [o.x.name, o.x.cat, f0(o.g12), f0(o.p12), o.p12 > 0 ? pct(o.g12 / o.p12 - 1) : '–', f0(o.gy), o.est == null ? '–' : kt(o.est), spark(o.x.v)]));
+  const fullY = PE.fullY, lastY = PE.lastY, p4 = c.p4 || {};
+  const lines = PE.rows.map(o => [o.x.name, o.x.cat, f0(o.g12), f0(o.p12), o.p12 > 0 ? pct(o.g12 / o.p12 - 1) : '–', f0(o.g25), o.e25 == null ? '–' : kt(o.e25), f0(o.g26), o.e26 == null ? '–' : `<b>${kt(o.e26)}</b>`, spark(o.x.v)]);
+  if (PE.rows.length > 1) lines.push(`<tr class="sum"><td>합계</td><td></td><td>${f0(sum(PE.rows.map(o => o.g12)))}</td><td>${f0(sum(PE.rows.map(o => o.p12)))}</td><td></td><td>${f0(sum(PE.rows.map(o => o.g25)))}</td><td>${kt(sum(PE.rows.map(o => o.e25 || 0)))}${PE.e25 == null ? '*' : ''}</td><td>${f0(PE.g26)}</td><td>${kt(sum(PE.rows.map(o => o.e26 || 0)))}${PE.e26 == null ? '*' : ''}</td><td></td></tr>`);
+  table('t-co5', ['발전소', '구분', '최근 12개월 (GWh)', '직전 12개월', '증감', `${fullY}년 발전량`, `${fullY}년 추정 배출 (천 톤)`, `${lastY}년 발전량 (예측 포함)`, `${lastY}년 추정 배출 (천 톤)`, '추이'], lines);
   document.querySelectorAll('#t-co5 td:nth-child(2),#t-co5 th:nth-child(2)').forEach(e => e.classList.add('l'));
-  const e = emOf(c, fullY);
-  $('#co-pl-note').innerHTML = `추정 배출은 ${fullY}년 발전량 × 배출계수(석탄 ${coalFactor().toFixed(2)}, LNG ${LNGF} tCO₂/MWh, 석탄 계수는 발전5사 보정값의 평균)입니다.` +
-    (estAll != null && ref ? ` 이 기업의 ${fullY}년 <b>추정 배출 ${kt(estAll)}천 톤</b>은 ${e.src === 'tm' ? '목표관리 명세서' : '인증'} 배출량 <b>${kt(ref)}천 톤</b>의 ${(estAll / ref * 100).toFixed(0)}%입니다.` : '') +
-    ` 집단에너지(열병합)는 열 생산에 쓴 연료의 배출이 발전량만으로는 잡히지 않아 과소 추정됩니다. 월보의 이름이 중간에 바뀐 발전소는 같은 발전소로 합쳤습니다.`;
+  const e = emOf(c, fullY), ref = e ? e.v : null, p26 = p4[lastY];
+  $('#co-pl-note').innerHTML = `추정 배출 = 발전량 × 배출계수(석탄 ${coalFactor().toFixed(2)}, LNG ${LNGF} tCO₂/MWh, 석탄 계수는 발전5사 보정값의 평균). ${lastY}년은 ${PE.mm}월까지 실적에 남은 ${PE.h}개월 예측(계절 나이브 + 최근 3개월 성장률 보정)을 더한 값입니다.` +
+    (PE.e25 != null && ref ? ` ${fullY}년 추정 배출 <b>${kt(PE.e25)}천 톤</b>은 ${e.src === 'tm' ? '목표관리 명세서' : '인증'} 배출량 <b>${kt(ref)}천 톤</b>의 ${(PE.e25 / ref * 100).toFixed(0)}%입니다.` : '') +
+    (PE.e26 != null ? ` <b>${lastY}년 추정 배출은 ${kt(PE.e26)}천 톤</b>` + (ref ? `으로 ${fullY}년 ${e.src === 'tm' ? '신고' : '인증'} 배출량 대비 ${pct(PE.e26 / ref - 1)}` : '') + (p26 ? `, ${lastY}년 4차 사전할당 ${kt(p26)}천 톤(유상 포함)의 ${(PE.e26 / p26 * 100).toFixed(0)}%입니다` : '') + '.' : '') +
+    ` 집단에너지(열병합)는 열 생산에 쓴 연료의 배출이 발전량만으로는 잡히지 않아 과소 추정됩니다.` + (PE.e26 == null && PE.rows.length > 1 ? ' 합계의 * 표시는 배출계수가 없는 발전소(유류 등)를 뺀 값입니다.' : '') + ` 월보의 이름이 중간에 바뀐 발전소는 같은 발전소로 합쳤습니다.`;
 }
+let coPE = null;
 function coShow(k) {
   const c = coByKey[k]; if (!c) return; coSel = k;
   const ys = Object.keys(c.y).map(Number).sort(), yl = last(ys), d = yl ? c.y[yl] : null, p4 = c.p4 || {}, tm = c.tm || {}, tmY = Object.keys(tm).map(Number).sort();
   const old = c.names.filter(n => n !== c.name);
   const genco = (GENCO.find(([n]) => c.name.includes(n)) || [])[1];
   const basisOf = y => (D.tmBasis || {})[y] || '';
+  coPE = c.plants ? coPlantEst(c) : null;
   let h = `<div class="panel"><div class="cohead"><h2>${c.name}</h2>${c.sector ? `<span class="pill">${c.sector}</span>` : ''}${c.sec4 ? `<span class="pill">4차 ${c.sec4}</span>` : ''}${c.newco ? '<span class="pill">목표관리업체</span>' : (!ys.length && p4[2026] ? '<span class="pill">4차 신규 지정</span>' : '')}${c.paid4 || c.paid ? `<span class="pill">${c.paid4 ? (c.paid4 === 'Y' ? '4차 유상할당 대상' : '4차 전량 무상') : (c.paid === 'Y' ? '3차 유상할당 대상' : '3차 전량 무상')}</span>` : ''}</div>
     <p class="sub">${c.industry || c.tmi || ''}${old.length ? ' · 옛 사명: ' + old.join(', ') : ''}${c.note ? ' · ' + c.note : ''}</p>${c.parent ? `<p class="sub">${c.parent.join(' / ')}</p>` : ''}</div><div class="tiles">`;
   if (d) {
@@ -935,7 +943,7 @@ function coShow(k) {
   const tyNew = tmY.filter(y => !c.y[y]).pop();
   if (tyNew) { const pv = tm[tyNew - 1]; h += tile(`${tyNew}년 배출량 (목표관리 명세서)`, `${kt(tm[tyNew])}<small>천 톤</small>`, `${c.tmk[tyNew] || ''} 기준${pv ? ' · 전년 대비 ' + pct(tm[tyNew] / pv - 1) : ''} · 명세서 ${basisOf(tyNew)}`); }
   if (p4[2026]) { const ref = d ? d[E.em] : tyNew ? tm[tyNew] : null; h += tile('4차 사전할당 (2026 → 2030)', `${kt(p4[2026])} → ${kt(p4[2030])}<small>천 톤</small>`, ref ? `2026 할당은 ${d ? yl : tyNew}년 배출량의 ${(p4[2026] / ref * 100).toFixed(0)}%` : '4차 신규 할당 대상'); }
-  h += `</div><div class="panel"><h2>할당량과 배출량</h2><p class="sub">막대: 3차 사전할당(조정)·4차 사전할당, 실선: 인증배출량, 점선: 목표관리 명세서 배출량 (천 톤)</p><div class="chart" id="c-co1"></div></div>`;
+  h += `</div><div class="panel"><h2>할당량과 배출량</h2><p class="sub">막대: 3차 사전할당(조정)·4차 사전할당, 실선: 인증배출량, 점선: 목표관리 명세서 배출량, 속이 빈 마름모: 올해 발전량 기반 추정 배출 (천 톤)</p><div class="chart" id="c-co1"></div></div>`;
   if (c.plants) h += `<div class="panel"><div class="phead"><div><h2>보유 발전소 월별 발전량</h2><p class="sub" id="co-pl-sub"></p></div><select id="co-pl" aria-label="발전소"></select></div>
     <div class="chart short" id="c-co4"></div><div class="tblwrap" style="max-height:none"><table id="t-co4" class="compact"></table></div></div>
     <div class="panel"><h2>보유 발전소</h2><p class="sub">전력통계월보 7-2 기준, 발전소-기업 대응표로 연결</p><div class="tblwrap" style="max-height:none"><table id="t-co5" class="compact"></table></div><p class="note" id="co-pl-note"></p></div>`;
@@ -949,6 +957,7 @@ function coShow(k) {
       {name: '3차 사전할당(조정)', type: 'bar', stack: 'a', data: ax.map(y => c.y[y] ? Math.round(c.y[y][E.pre] / 1e3) : null), itemStyle: {color: S(1), borderRadius: [4, 4, 0, 0]}, barMaxWidth: 36},
       {name: '4차 사전할당', type: 'bar', stack: 'a', data: ax.map(y => p4[y] ? Math.round(p4[y] / 1e3) : null), itemStyle: {color: S(3), borderRadius: [4, 4, 0, 0]}, barMaxWidth: 36},
       ln('인증배출량', ax.map(y => c.y[y] ? Math.round(c.y[y][E.em] / 1e3) : null), css('--ink'), {lineStyle: {width: 3, color: css('--ink')}}),
+      coPE && coPE.e26 != null ? ln(`${coPE.lastY} 추정 배출 (발전량 기반)`, ax.map(y => y === coPE.lastY ? Math.round(coPE.e26 / 1e3) : null), S(2), {symbol: 'emptyDiamond', symbolSize: 14, lineStyle: {width: 0}, itemStyle: {color: S(2), borderWidth: 3}}) : null,
       tmY.length ? ln('목표관리 명세서 배출량', ax.map(y => tm[y] != null ? Math.round(tm[y] / 1e3) : null), S(4), {lineStyle: {width: 3, type: 'dashed', color: S(4)}, symbolSize: 8, symbol: 'diamond'}) : null,
     ].filter(Boolean)});
   if (ys.length) {
@@ -962,9 +971,10 @@ function coShow(k) {
       R('인증배출량', E.em), R('과부족', E.surplus, 1), R('차기 이월(실적)', E.cout), R('차입', E.bout), R('유상 경매 낙찰(추정)', E.auc)] : [];
     const rowsP4 = p4[2026] ? [`<tr><td>4차 사전할당</td>${ax.map(y => `<td>${p4[y] ? kt(p4[y]) : '–'}</td>`).join('')}</tr>`] : [];
     const rowsT = tmY.length ? [`<tr class="sum"><td>목표관리 명세서 배출량</td>${ax.map(y => `<td>${tm[y] != null ? kt(tm[y]) : '–'}</td>`).join('')}</tr>`] : [];
-    table('t-co', ['', ...ax], [...rowsE, ...rowsP4, ...rowsT]);
+    const rowsG = coPE && coPE.e26 != null ? [`<tr><td>발전량 기반 추정 배출</td>${ax.map(y => `<td>${y === coPE.fullY && coPE.e25 != null ? kt(coPE.e25) : y === coPE.lastY ? kt(coPE.e26) : '–'}</td>`).join('')}</tr>`] : [];
+    table('t-co', ['', ...ax], [...rowsE, ...rowsP4, ...rowsG, ...rowsT]);
   }
-  if (c.plants) { $('#co-pl').innerHTML = ''; coPlant = '__all'; coPlants(c); }
+  if (c.plants) { $('#co-pl').innerHTML = ''; coPlants(c); }
   if (genco) { const G = D.power.gencoY, gs = G.s[genco];
     draw('c-co3', {tooltip: {axisPointer: {type: 'shadow'}}, xAxis: cat(G.t), yAxis: val({}),
       series: FUELS.filter(f => gs[f] && sum(gs[f]) > 0).map(f => stackBar(f, gs[f].map(Math.round), S(FUELC[FUELS.indexOf(f)])))}); }
